@@ -1,0 +1,1 @@
+# Embedding benzerlik kontrolü

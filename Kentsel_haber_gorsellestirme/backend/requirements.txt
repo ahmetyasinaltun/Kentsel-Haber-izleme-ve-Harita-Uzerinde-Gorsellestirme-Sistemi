@@ -1,0 +1,7 @@
+# Python bağımlılıkları
+fastapi
+uvicorn
+pymongo
+pydantic
+httpx
+beautifulsoup4

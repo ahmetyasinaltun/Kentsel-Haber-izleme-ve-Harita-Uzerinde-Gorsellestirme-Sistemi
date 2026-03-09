@@ -1,0 +1,1 @@
+# Ayarlar, env okuma
