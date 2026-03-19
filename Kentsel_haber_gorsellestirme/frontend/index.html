@@ -1,13 +1,740 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <title>Kentsel Haber Görselleştirme</title>
-    <link rel="stylesheet" href="css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kocaeli Haber Haritası</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════════ */
+:root {
+  --bg:        #08111e;
+  --surface:   #0f1b2d;
+  --surface2:  #152236;
+  --border:    #1c2f48;
+  --accent:    #00d4ff;
+  --accent-dim:rgba(0,212,255,.12);
+  --text:      #d8e6f4;
+  --muted:     #4a6880;
+  --mono:      'IBM Plex Mono', monospace;
+  --display:   'Syne', sans-serif;
+  --body:      'Inter', sans-serif;
+
+  /* haber türü renkleri */
+  --c-kaza:    #ef4444;
+  --c-yangin:  #f97316;
+  --c-elektrik:#facc15;
+  --c-hirsiz:  #a855f7;
+  --c-kultur:  #22d3ee;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════════ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--body);
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* grid arka plan */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events:none; z-index:0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════════════════ */
+#topbar {
+  position: relative; z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.topbar-brand .brand-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #0070ff);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.topbar-brand .brand-text {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.3px;
+}
+.topbar-brand .brand-text span { color: var(--accent); }
+
+.topbar-spacer { flex: 1; }
+
+/* Haber sayacı */
+#news-counter {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#news-counter strong {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+/* Scrape butonu */
+#btn-scrape {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .05em;
+}
+#btn-scrape:hover { border-color: var(--accent); color: var(--accent); }
+#btn-scrape.loading { opacity:.6; cursor:not-allowed; }
+#btn-scrape .spin { display:none; }
+#btn-scrape.loading .spin { display:inline-block; animation: spin .8s linear infinite; }
+#btn-scrape.loading .scrape-icon { display:none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Odaklan butonu */
+#btn-focus {
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+}
+#btn-focus:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════
+   MAIN LAYOUT: sidebar + harita
+═══════════════════════════════════════════════════════ */
+#main {
+  position: relative; z-index: 1;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════════════ */
+#sidebar {
+  width: 310px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Filtre bölümü */
+#filter-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-row .field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+label.f-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+select, input[type="date"] {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+select:focus, input[type="date"]:focus { border-color: var(--accent); }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.4); cursor:pointer; }
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#btn-reset-filters {
+  flex: 1;
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .05em;
+}
+#btn-reset-filters:hover { border-color: var(--muted); color: var(--text); }
+
+/* Kategori rozeti satırı */
+#legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.legend-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .2s;
+  user-select: none;
+}
+.legend-chip:hover { color: var(--text); }
+.legend-chip.active { border-color: var(--chip-color); color: var(--chip-color); background: color-mix(in srgb, var(--chip-color) 10%, transparent); }
+.legend-chip .chip-dot { width:7px; height:7px; border-radius:50%; background: var(--chip-color); }
+
+/* Haber listesi */
+#news-list-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 8px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.no-news {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.news-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+.news-item:hover         { background: var(--surface2); border-color: var(--border); }
+.news-item.active        { background: var(--surface2); border-color: var(--item-color,var(--accent)); }
+.news-item.no-coords     { opacity:.5; cursor:default; }
+.news-item.no-coords::after {
+  content: '📍?';
+  position: absolute; right:8px; top:8px;
+  font-size: 10px; color: var(--muted);
+}
+
+.ni-icon { font-size: 20px; flex-shrink:0; margin-top:1px; }
+
+.ni-body  { flex:1; min-width:0; }
+.ni-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.ni-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  flex-wrap: wrap;
+}
+
+/* Sidebar alt durum çubuğu */
+#sidebar-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════════
+   HARİTA
+═══════════════════════════════════════════════════════ */
+#map-wrap {
+  flex: 1;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Harita yükleniyor ekranı */
+#map-loading {
+  position: absolute; inset:0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 5;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  transition: opacity .4s;
+}
+#map-loading.hidden { opacity:0; pointer-events:none; }
+
+.loader-ring {
+  width: 36px; height:36px;
+  border-radius:50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+
+/* Toast bildirimi */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .3s cubic-bezier(.16,1,.3,1);
+  pointer-events: none;
+  max-width: 340px;
+}
+#toast.show   { transform: translateY(0); opacity:1; }
+#toast.success { border-color: rgba(16,185,129,.4); }
+#toast.error   { border-color: rgba(239,68,68,.4); }
+
+/* ═══════════════════════════════════════════════════════
+   GOOGLE MAPS InfoWindow stili
+   (Maps JS API'ye .gm-style-iw üzerinden enjekte edilir)
+═══════════════════════════════════════════════════════ */
+.gm-style-iw-c { padding:0 !important; border-radius:12px !important; background: #0f1b2d !important; }
+.gm-style-iw-d { overflow: hidden !important; }
+.gm-style-iw-t::after { display:none; }
+.gm-ui-hover-effect > span { background:#fff !important; }
+
+.iw-wrap {
+  background: var(--surface, #0f1b2d);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 260px;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.iw-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+.iw-emoji { font-size: 18px; }
+.iw-type-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cfg-color, #00d4ff);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.iw-title {
+  padding: 8px 16px 6px;
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #d8e6f4;
+  line-height: 1.4;
+}
+.iw-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #4a6880;
+}
+.iw-sources {
+  padding: 6px 16px 0;
+  font-size: 11px;
+  color: #4a6880;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.iw-src-label { color: #2a4a6a; margin-right:4px; }
+.iw-source-link {
+  color: #00d4ff;
+  text-decoration: none;
+  font-size: 11px;
+}
+.iw-source-link:hover { text-decoration: underline; }
+.iw-btn {
+  display: block;
+  margin: 12px 16px 14px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  background: var(--cfg-color, #00d4ff);
+  color: #000;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  transition: opacity .2s;
+}
+.iw-btn:hover { opacity: .85; }
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  #sidebar { width: 100%; max-height: 40dvh; border-right: none; border-bottom: 1px solid var(--border); }
+  #main    { flex-direction: column; }
+  #map-wrap{ flex:1; min-height: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   FADE-IN
+═══════════════════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+#sidebar { animation: fadeUp .5s ease both; }
+</style>
 </head>
 <body>
-    <script src="js/api.js"></script>
-    <script src="js/filters.js"></script>
-    <script src="js/map.js"></script>
+
+<!-- ══════════════ TOPBAR ══════════════ -->
+<header id="topbar">
+  <a class="topbar-brand" href="#" title="Ana sayfaya dön" onclick="focusMap();return false;">
+    <div class="brand-icon">🗺️</div>
+    <div class="brand-text">Kocaeli <span>Haber</span> Haritası</div>
+  </a>
+
+  <div class="topbar-spacer"></div>
+
+  <div id="news-counter">
+    <strong id="news-count">—</strong> haber
+  </div>
+
+  <button id="btn-focus"  title="Kocaeli'ye odaklan" onclick="focusMap()">🎯</button>
+
+  <button id="btn-scrape">
+    <span class="scrape-icon">⟳</span>
+    <span class="spin">↻</span>
+    <span>Haberleri Güncelle</span>
+  </button>
+</header>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+
+    <!-- Filtreler -->
+    <div id="filter-section">
+      <div class="filter-row">
+        <div class="field">
+          <label class="f-label" for="filter-news-type">Haber Türü</label>
+          <select id="filter-news-type">
+            <option value="">Tüm Türler</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="f-label" for="filter-district">İlçe</label>
+          <select id="filter-district">
+            <option value="">Tüm İlçeler</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <div class="field">
+          <label class="f-label" for="filter-date-from">Başlangıç</label>
+          <input type="date" id="filter-date-from">
+        </div>
+        <div class="field">
+          <label class="f-label" for="filter-date-to">Bitiş</label>
+          <input type="date" id="filter-date-to">
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button id="btn-reset-filters">↺ Sıfırla</button>
+      </div>
+    </div>
+
+    <!-- Kategori rozeti satırı -->
+    <div id="legend-row">
+      <div class="legend-chip active" style="--chip-color:var(--c-kaza)"    data-type="Trafik Kazası">     <div class="chip-dot"></div>Kaza</div>
+      <div class="legend-chip active" style="--chip-color:var(--c-yangin)"  data-type="Yangın">            <div class="chip-dot"></div>Yangın</div>
+      <div class="legend-chip active" style="--chip-color:var(--c-elektrik)"data-type="Elektrik Kesintisi"><div class="chip-dot"></div>Elektrik</div>
+      <div class="legend-chip active" style="--chip-color:var(--c-hirsiz)"  data-type="Hırsızlık">         <div class="chip-dot"></div>Hırsızlık</div>
+      <div class="legend-chip active" style="--chip-color:var(--c-kultur)"  data-type="Kültürel Etkinlik"> <div class="chip-dot"></div>Etkinlik</div>
+    </div>
+
+    <!-- Haber listesi -->
+    <div id="news-list-wrap">
+      <div id="news-list">
+        <div class="no-news">Haberler yükleniyor…</div>
+      </div>
+    </div>
+
+    <!-- Alt durum -->
+    <div id="sidebar-footer">
+      <span id="footer-status">Hazır</span>
+      <span id="footer-time">—</span>
+    </div>
+
+  </aside>
+
+  <!-- HARİTA -->
+  <div id="map-wrap">
+    <div id="map-loading">
+      <div class="loader-ring"></div>
+      <span>Harita yükleniyor…</span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" role="alert" aria-live="polite"></div>
+
+<!-- ══════════════ SCRIPTS ══════════════ -->
+<script type="module">
+  import { fetchNews, fetchFilterOptions, triggerScrape } from "./js/api.js";
+  import { initFilters, updateNewsCount, getCurrentFilters } from "./js/filters.js";
+  import { initMap, loadNewsOnMap, clearMarkers, focusKocaeli } from "./js/map.js";
+
+  // Global: topbar buton onclick için
+  window.focusMap = focusKocaeli;
+
+  // ── Toast ─────────────────────────────────────────────
+  let _toastTimer;
+  function showToast(msg, type = "info") {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.className = ""; }, 3600);
+  }
+
+  // ── Footer güncelle ───────────────────────────────────
+  function setFooter(status) {
+    document.getElementById("footer-status").textContent = status;
+    document.getElementById("footer-time").textContent   =
+      new Date().toLocaleTimeString("tr-TR", { hour:"2-digit", minute:"2-digit" });
+  }
+
+  // ── Harita yüklenince overlay'ı kaldır ────────────────
+  window.addEventListener("maps-ready", () => {
+    document.getElementById("map-loading").classList.add("hidden");
+    setFooter("Harita hazır");
+  });
+
+  // ── Haberleri yükle ───────────────────────────────────
+  async function loadNews(filters = {}) {
+    setFooter("Yükleniyor…");
+    try {
+      const data = await fetchNews(filters);
+      updateNewsCount(data.length);
+      loadNewsOnMap(data);
+      setFooter(`${data.length} haber gösteriliyor`);
+    } catch (e) {
+      showToast("Haberler yüklenemedi: " + e.message, "error");
+      setFooter("Hata oluştu");
+    }
+  }
+
+  // ── Filtreler hazır olunca haberler yüklenir ──────────
+  await initFilters((filters) => loadNews(filters));
+  await loadNews(getCurrentFilters());
+
+  // ── Scrape butonu ────────────────────────────────────
+  const scrapeBtn = document.getElementById("btn-scrape");
+  scrapeBtn.addEventListener("click", async () => {
+    if (scrapeBtn.classList.contains("loading")) return;
+    scrapeBtn.classList.add("loading");
+    setFooter("Scraping başlatıldı…");
+    try {
+      const res = await triggerScrape();
+      showToast(`✓ ${res.saved ?? 0} yeni haber kaydedildi`, "success");
+      await loadNews(getCurrentFilters());
+    } catch (e) {
+      showToast("Scraping hatası: " + e.message, "error");
+      setFooter("Scraping başarısız");
+    } finally {
+      scrapeBtn.classList.remove("loading");
+    }
+  });
+
+  // ── Legend chip toggle (hızlı filtre) ────────────────
+  document.querySelectorAll(".legend-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("active");
+      // Sadece aktif chip'ler varsa filtre seçeneğine yansıt
+      const activeTypes = [...document.querySelectorAll(".legend-chip.active")]
+        .map((c) => c.dataset.type);
+
+      // Seçim tekse select'i güncelle; aksi hâlde sıfırla
+      const sel = document.getElementById("filter-news-type");
+      if (activeTypes.length === 1) {
+        sel.value = activeTypes[0];
+      } else {
+        sel.value = "";
+      }
+      sel.dispatchEvent(new Event("change"));
+    });
+  });
+
+  // Dışarıdan initMap çağrısı için Google Maps callback
+  window.__mapReady = () => {
+    initMap();
+    window.dispatchEvent(new Event("maps-ready"));
+  };
+</script>
+
+<!--
+  Google Maps API yükleme.
+  YOUR_API_KEY → .env dosyasından veya sunucu tarafından enjekte edilmeli.
+  Örnek (FastAPI'den template ile):
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_KEY }}&libraries=marker&callback=__mapReady&loading=async" defer></script>
+-->
+<script>
+  (async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/config/maps-key"); // ← düzeltildi
+      if (!res.ok) throw new Error("endpoint hatası");
+      const { key } = await res.json();
+      if (!key) throw new Error("key yok");
+
+      const s  = document.createElement("script");
+      s.src    = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=marker&callback=__mapReady&loading=async`;
+      s.defer  = true;
+      s.onerror = () => {
+        document.getElementById("map-loading").innerHTML =
+          `<span style="color:#ef4444;font-family:monospace;font-size:12px">Google Maps yüklenemedi. API anahtarını kontrol edin.</span>`;
+      };
+      document.head.appendChild(s);
+    } catch(e) {
+      document.getElementById("map-loading").innerHTML = `
+        <span style="color:#facc15;font-family:monospace;font-size:11px;padding:16px;text-align:center">
+          ⚠️ Google Maps API anahtarı alınamadı.<br>
+          Backend'de <code>/api/config/maps-key</code> endpoint'i gerekli.<br><br>
+          <em>Geliştirme için index.html'deki script bloğuna anahtarı doğrudan ekleyebilirsiniz.</em>
+        </span>`;
+    }
+  })();
+</script>
+
 </body>
 </html>

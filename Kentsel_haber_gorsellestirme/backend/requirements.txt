@@ -1,7 +1,10 @@
 # Python bağımlılıkları
 fastapi
-uvicorn
+uvicorn[standard]
 pymongo
-pydantic
-httpx
+python-dotenv
+requests
 beautifulsoup4
+sentence-transformers
+spacy
+python-dateutil
