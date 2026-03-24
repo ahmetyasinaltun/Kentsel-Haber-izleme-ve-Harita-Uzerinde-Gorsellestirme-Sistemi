@@ -8,8 +8,11 @@ def insert_news(news: dict) -> str:
     result = news_collection().insert_one(news)
     return str(result.inserted_id)
 
-def get_all_news(filters: dict = {}) -> list:
-    return list(news_collection().find(filters, {"embedding": 0}))
+def get_all_news(filter_query=None, sort_by="published_at", sort_order=-1):
+    collection = news_collection()
+    cursor = collection.find(filter_query or {}, {"embedding": 0})
+    cursor = cursor.sort(sort_by, sort_order)
+    return list(cursor)
 
 def get_news_by_type(news_type: str) -> list:
     return list(news_collection().find({"news_type": news_type}, {"embedding": 0}))

@@ -1,21 +1,19 @@
-# api/routes.py
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from bson import ObjectId
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from fastapi.responses import JSONResponse
 
-from db.repository import (
-    get_all_news,
-    get_news_by_type,
-    get_news_by_date_range,
-)
+from db.repository import get_all_news, get_news_by_type, get_news_by_date_range
 
 router = APIRouter()
 
-# ── YARDIMCI FONKSİYON ───────────────────────────────────────────────────────
+# ── YARDIMCI ─────────────────────────────────────────────────────────────────
 
 def serialize_news(news_list: list) -> list:
-    """ObjectId → str, datetime → ISO string dönüşümü"""
     result = []
     for item in news_list:
         item["_id"] = str(item["_id"])
@@ -26,88 +24,85 @@ def serialize_news(news_list: list) -> list:
         result.append(item)
     return result
 
-
 # ── SCRAPING ─────────────────────────────────────────────────────────────────
 
-# Bu flag, aynı anda iki scraping işleminin çalışmasını önler
 _scraping_in_progress = False
 
+def _run_scraper(scraper) -> list:
+    """Tek bir scraper'ı çalıştırır — thread içinde çağrılır."""
+    print(f"🕷️  {scraper.site_name} scraping başladı...")
+    t0 = time.time()
+    try:
+        news = scraper.get_news()
+        elapsed = time.time() - t0
+        print(f"⏱️  {scraper.site_name}: {len(news)} haber / {elapsed:.1f}s")
+        return news
+    except Exception as e:
+        print(f"❌ {scraper.site_name} scraper hatası: {e}")
+        return []
+
+
 def run_scraping_pipeline():
-    """Tüm scraper'ları çalıştırır, pipeline'dan geçirir, DB'ye yazar."""
+    """Tüm scraper'ları paralel çalıştırır, pipeline'dan geçirir, DB'ye yazar."""
     global _scraping_in_progress
     _scraping_in_progress = True
-    try:
-        from scraper.cagdaskocaeli   import CagdasKocaeliScraper
-        from scraper.ozgurkocaeli    import OzgurKocaeliScraper
-        from scraper.seskocaeli      import SesKocaeliScraper
-        from scraper.yenikocaeli     import YeniKocaeliScraper
-        from scraper.bizimyaka       import BizimYakaScraper
+    pipeline_start = time.time()
 
-        from pipeline.cleaner            import clean_news
-        from pipeline.classifier         import classify_news
-        from pipeline.location_extractor import extract_location
-        from pipeline.geocoder           import geocode_location
+    try:
+        from scraper.daktilo_scraper import (
+            CagdasKocaeliScraper, OzgurKocaeliScraper,
+            SesKocaeliScraper, BizimYakaScraper,
+        )
+        from scraper.yenikocaeli import YeniKocaeliScraper
+        from pipeline.cleaner            import clean_articles
+        from pipeline.classifier         import classify_articles
+        from pipeline.location_extractor import extract_locations
+        from pipeline.geocoder           import geocode_articles
         from pipeline.deduplicator       import deduplicate_articles
         from db.repository               import insert_news
-        from datetime                    import datetime
 
         scrapers = [
             CagdasKocaeliScraper(),
             OzgurKocaeliScraper(),
             SesKocaeliScraper(),
-            YeniKocaeliScraper(),
             BizimYakaScraper(),
+            YeniKocaeliScraper(),
         ]
 
-        # ── AŞAMA 1: Tüm scraper'lardan ham veri topla ───────────────── #
-        candidates = []
+        print("=" * 55)
+        print(f"🚀 Scraping başladı — {len(scrapers)} site PARALEL çalışıyor")
+        print("=" * 55)
 
-        for scraper in scrapers:
-            print(f"🕷️  {scraper.site_name} scraping başladı...")
-            try:
-                raw_news_list = scraper.get_news()
-            except Exception as e:
-                print(f"❌ {scraper.site_name} scraper hatası: {e}")
-                continue
+        # ── 4 site aynı anda ────────────────────────────────────
+        raw_all = []
+        scrape_start = time.time()
+        with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
+            futures = {executor.submit(_run_scraper, s): s for s in scrapers}
+            for future in as_completed(futures):
+                raw_all.extend(future.result())
 
-            for raw in raw_news_list:
-                try:
-                    # 1. Temizle
-                    news = clean_news(raw)
+        scrape_elapsed = time.time() - scrape_start
+        print(f"⏱️  Toplam scraping süresi: {scrape_elapsed:.1f}s")
+        print(f"📥 Ham haber toplamı: {len(raw_all)}")
 
-                    # 2. Sınıflandır — kategori yoksa atla
-                    news_type = classify_news(news["content"])
-                    if not news_type:
-                        continue
-                    news["news_type"] = news_type
+        # ── Pipeline ────────────────────────────────────────────
+        cleaned    = clean_articles(raw_all)
+        classified = classify_articles(cleaned)
+        classified = [n for n in classified
+                      if n.get("news_type") and n["news_type"] != "Diğer"]
+        print(f"🏷️  Sınıflandırma sonrası: {len(classified)} haber")
 
-                    # 3. Konum çıkar
-                    location_text = extract_location(news["content"])
-                    if not location_text:
-                        continue  # Konum yoksa haritada gösterilemez, kaydetme
-                    news["location_text"] = location_text
+        located = extract_locations(classified)
+        located = [n for n in located if n.get("location_text")]
+        print(f"📍 Konum bulunan: {len(located)} haber")
 
-                    # 4. Geocode et — başarısızsa atla
-                    coords = geocode_location(location_text)
-                    if not coords:
-                        continue
-                    news["location_coords"] = coords
+        geocoded = geocode_articles(located)
+        geocoded = [n for n in geocoded if n.get("location_coords")]
+        print(f"🌍 Geocode başarılı: {len(geocoded)} haber")
 
-                    news["scraped_at"] = datetime.utcnow()
-                    candidates.append(news)
+        unique_news = deduplicate_articles(geocoded)
+        print(f"📋 Unique haber: {len(unique_news)}")
 
-                except Exception as e:
-                    print(f"⚠️  Haber işleme hatası: {e}")
-
-        print(f"📋 Pipeline çıktısı: {len(candidates)} aday haber")
-
-        # ── AŞAMA 2: Tüm adayları toplu duplicate kontrolünden geçir ─── #
-        # deduplicate_articles hem link kontrolü hem embedding karşılaştırması yapar.
-        # Duplicate olanlar için mevcut haberin sources listesini günceller (DB'ye yazar).
-        # Geriye yalnızca gerçekten yeni haberler döner.
-        unique_news = deduplicate_articles(candidates)
-
-        # ── AŞAMA 3: Yeni haberleri DB'ye kaydet ─────────────────────── #
         saved = 0
         for news in unique_news:
             try:
@@ -116,8 +111,16 @@ def run_scraping_pipeline():
             except Exception as e:
                 print(f"⚠️  DB kayıt hatası: {e}")
 
-        print(f"✅ Scraping tamamlandı. {saved} yeni haber kaydedildi.")
+        total_elapsed = time.time() - pipeline_start
+        print("=" * 55)
+        print(f"✅ Scraping tamamlandı — {saved} yeni haber kaydedildi")
+        print(f"⏱️  Toplam süre: {total_elapsed:.1f}s")
+        print("=" * 55)
 
+    except Exception as e:
+        print(f"❌ Pipeline genel hatası: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         _scraping_in_progress = False
 
@@ -140,36 +143,40 @@ def scrape_status():
 
 @router.get("/news", summary="Tüm haberleri getir (isteğe bağlı filtre)")
 def get_news(
-    news_type: Optional[str] = Query(None, description="Haber türü (ör: Yangın)"),
-    district:  Optional[str] = Query(None, description="İlçe adı (ör: İzmit)"),
-    start_date: Optional[str] = Query(None, description="Başlangıç tarihi (YYYY-MM-DD)"),
-    end_date:   Optional[str] = Query(None, description="Bitiş tarihi (YYYY-MM-DD)"),
+    news_type:  Optional[str] = Query(None),
+    district:   Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date:   Optional[str] = Query(None),
 ):
     mongo_filter = {}
-
-    # Tür filtresi
     if news_type:
         mongo_filter["news_type"] = news_type
-
-    # İlçe filtresi
     if district:
         mongo_filter["district"] = {"$regex": district, "$options": "i"}
-
-    # Tarih filtresi
     if start_date or end_date:
         date_filter = {}
         try:
             if start_date:
-                date_filter["$gte"] = datetime.strptime(start_date, "%Y-%m-%d")
+                date_filter["$gte"] = datetime.strptime(start_date, "%Y-%m-%d").replace(
+                    hour=0, minute=0, second=0, microsecond=0)
             if end_date:
-                # Bitiş gününün sonuna kadar (23:59:59)
-                date_filter["$lte"] = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+                date_filter["$lte"] = datetime.strptime(end_date, "%Y-%m-%d").replace(
+                    hour=23, minute=59, second=59, microsecond=999999)
         except ValueError:
             raise HTTPException(status_code=400, detail="Tarih formatı yanlış. YYYY-MM-DD kullanın.")
         mongo_filter["published_at"] = date_filter
 
-    news_list = get_all_news(mongo_filter)
+    news_list = get_all_news(mongo_filter, sort_by="published_at", sort_order=-1)
     return {"count": len(news_list), "news": serialize_news(news_list)}
+
+
+@router.delete("/news", summary="Tüm haberleri veritabanından sil")
+def delete_all_news():
+    from db.connection import news_collection
+    result = news_collection().delete_many({})
+    deleted = result.deleted_count
+    print(f"🗑️  {deleted} haber veritabanından silindi.")
+    return {"deleted": deleted, "message": f"{deleted} haber silindi."}
 
 
 @router.get("/news/{news_id}", summary="Tek haber getir")
@@ -179,30 +186,24 @@ def get_single_news(news_id: str):
         oid = ObjectId(news_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Geçersiz haber ID.")
-
-    item = news_collection().find_one({"_id": oid}, {"embedding": 0})  # () eklendi
+    item = news_collection().find_one({"_id": oid}, {"embedding": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Haber bulunamadı.")
-
     return serialize_news([item])[0]
 
 
 @router.get("/filter/options", summary="Filtre dropdown seçenekleri")
 def filter_options():
     from db.connection import news_collection
+    news_types = sorted([t for t in news_collection().distinct("news_type") if t])
+    districts  = sorted([d for d in news_collection().distinct("district")  if d])
+    return {"news_types": news_types, "districts": districts}
 
-    news_types = news_collection().distinct("news_type")  # () eklendi
-    districts   = news_collection().distinct("district")   # () eklendi
 
-    news_types = sorted([t for t in news_types if t])
-    districts  = sorted([d for d in districts  if d])
-
-    return {
-        "news_types": news_types,
-        "districts":  districts,
-    }
-# api/routes.py içine ekleyin
 @router.get("/config/maps-key")
 async def get_maps_key():
-    from config import GOOGLE_MAPS_KEY   # ← direkt değişken
-    return {"key": GOOGLE_MAPS_KEY}
+    key = os.getenv("GOOGLE_MAPS_API_KEY")
+    if not key:
+        print("⚠️ HATA: GOOGLE_MAPS_API_KEY okunamadı!")
+        return JSONResponse({"key": "", "error": "API Key not found"}, status_code=200)
+    return {"key": key}

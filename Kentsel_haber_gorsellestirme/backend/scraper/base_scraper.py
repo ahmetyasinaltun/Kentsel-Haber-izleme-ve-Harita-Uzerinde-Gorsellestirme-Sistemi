@@ -1,31 +1,48 @@
 # Ortak scraper sınıfı
-import requests
+import time
+import random
+import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+
 
 class BaseScraper:
     def __init__(self, site_name: str, base_url: str):
         self.site_name = site_name
-        self.base_url = base_url
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/120.0.0.0 Safari/537.36"
-        }
+        self.base_url  = base_url
+        # Her instance için taze session — encoding'e kesinlikle dokunma
+        self._session  = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
 
-    def fetch_page(self, url: str) -> BeautifulSoup | None:
-        try:
-            response = requests.get(url, headers=self.headers, timeout=15)
-            response.raise_for_status()
-            return BeautifulSoup(response.text, "html.parser")
-        except Exception as e:
-            print(f"❌ {self.site_name} fetch hatası: {e}")
-            return None
+    def fetch_page(self, url: str, timeout: int = 20,
+                   retries: int = 2, delay: float = 2.0) -> BeautifulSoup | None:
+        last_error = None
+        for attempt in range(1 + retries):
+            try:
+                r = self._session.get(url, timeout=timeout, allow_redirects=True)
+                r.raise_for_status()
+                # r.text'e encoding atama — cloudscraper zaten doğru decode ediyor
+                soup  = BeautifulSoup(r.text, "html.parser")
+                links = soup.find_all("a", href=True)
+                if len(links) < 5 and attempt < retries:
+                    print(f"  ⚠️  {self.site_name}: Az link ({len(links)}), tekrar deneniyor...")
+                    time.sleep(delay + 2)
+                    continue
+                return soup
+            except Exception as e:
+                last_error = e
+                if attempt < retries:
+                    time.sleep(delay)
+
+        print(f"❌ {self.site_name} fetch hatası: {last_error}")
+        return None
+
+    def wait(self, base: float = 1.0):
+        time.sleep(base + random.uniform(0.2, 0.8))
 
     def is_recent(self, published_at: datetime, days: int = 3) -> bool:
-        """Son 3 gün içinde mi?"""
         return datetime.utcnow() - published_at <= timedelta(days=days)
 
     def get_news(self) -> list[dict]:
-        """Alt sınıflar bu metodu implement etmeli"""
         raise NotImplementedError
