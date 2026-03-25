@@ -42,19 +42,19 @@ class YeniKocaeliScraper(BaseScraper):
     def get_news(self) -> list[dict]:
         visited = set()
         article_links = []
+        lock = __import__("threading").Lock()
 
-        for cat_url in CATEGORY_PAGES:
+        # Kategori sayfalarını paralel çek — Lock ile thread-safe
+        def fetch_category(cat_url):
             soup = self.fetch_page(cat_url)
             if not soup:
                 print(f"  ⚠️  {cat_url} alınamadı")
-                continue
-
+                return []
+            links = []
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 if "://" in href and not href.startswith("http"):
                     continue
-
-                # whatsapp paylaşım linklerinden gömülü URL çıkar
                 if href.startswith("http"):
                     match = re.search(
                         r"https?://(?:www\.)?yenikocaeli\.com(/haber/[^#\s]+\.html)",
@@ -68,19 +68,23 @@ class YeniKocaeliScraper(BaseScraper):
                         continue
                 else:
                     path = href
-
                 if not path.startswith("/"):
                     path = "/" + path
-
                 if CATEGORY_RE.search(path):
                     continue
                 if not ARTICLE_RE.search(path):
                     continue
+                links.append(BASE_URL + path)
+            return links
 
-                full_url = BASE_URL + path
-                if full_url not in visited:
-                    visited.add(full_url)
-                    article_links.append(full_url)
+        with ThreadPoolExecutor(max_workers=len(CATEGORY_PAGES)) as executor:
+            futures = {executor.submit(fetch_category, url): url for url in CATEGORY_PAGES}
+            for future in as_completed(futures):
+                for full_url in future.result():
+                    with lock:
+                        if full_url not in visited:
+                            visited.add(full_url)
+                            article_links.append(full_url)
 
         article_links = article_links[:self.max_news]
         print(f"  📎 {self.site_name}: {len(article_links)} makale — "

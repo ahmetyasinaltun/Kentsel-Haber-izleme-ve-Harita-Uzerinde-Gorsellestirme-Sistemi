@@ -42,7 +42,11 @@ class BaseScraper:
         time.sleep(base + random.uniform(0.2, 0.8))
 
     def is_recent(self, published_at: datetime, days: int = 3) -> bool:
-        return datetime.utcnow() - published_at <= timedelta(days=days)
+        # Gün başlangıcı bazlı: bugün dahil geriye doğru `days` gün
+        # Örn: bugün 21 → 18, 19, 20, 21 dahil (18'in 00:00'ından itibaren)
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        cutoff = today_start - timedelta(days=days - 1)
+        return published_at >= cutoff
 
     def get_news(self) -> list[dict]:
         raise NotImplementedError

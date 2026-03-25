@@ -24,28 +24,11 @@ app.add_middleware(
 def on_startup():
     test_connection()
 
-    # DB'de son 3 günde haber var mı kontrol et
-    # Varsa scraping yapmadan devam et (--reload ile gereksiz tetiklenmeyi önler)
-    from datetime import datetime, timedelta
-    from db.connection import news_collection
-
-    try:
-        three_days_ago = datetime.utcnow() - timedelta(days=3)
-        recent_count = news_collection().count_documents(
-            {"scraped_at": {"$gte": three_days_ago}}
-        )
-    except Exception:
-        recent_count = 0
-
-    if recent_count > 0:
-        print(f"ℹ️  DB'de {recent_count} güncel haber mevcut — otomatik scraping atlandı.")
-        print("    Manuel scraping için arayüzdeki 'Haberleri Güncelle' butonunu kullanın.")
-    else:
-        print("🔄 DB'de güncel haber bulunamadı — otomatik scraping başlatılıyor...")
-        from api.routes import run_scraping_pipeline
-        # Startup'ı bloklamadan arka planda başlat
-        thread = threading.Thread(target=run_scraping_pipeline, daemon=True)
-        thread.start()
+    # Her başlatmada scraping yap (arka planda, startup'ı bloklamaz)
+    print("🔄 Uygulama başlatıldı — otomatik scraping başlıyor...")
+    from api.routes import run_scraping_pipeline
+    thread = threading.Thread(target=run_scraping_pipeline, daemon=True)
+    thread.start()
 
 
 app.include_router(router, prefix="/api")

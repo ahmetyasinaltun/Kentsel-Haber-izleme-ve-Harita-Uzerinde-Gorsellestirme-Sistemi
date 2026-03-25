@@ -533,7 +533,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 <script type="module">
   import { fetchNews, fetchFilterOptions, triggerScrape, deleteAllNews } from "./js/api.js";
   import { initFilters, updateNewsCount, getCurrentFilters,
-           resetFilters, setFilterNewsType } from "./js/filters.js";
+           resetFilters, setFilterNewsType, onDateChange } from "./js/filters.js";
   import { initMap, loadNewsOnMap, clearMarkers, setMapTheme } from "./js/map.js";
 
   // ── Tema ─────────────────────────────────────────────
@@ -715,6 +715,66 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 
   // ── Filtre sıfırla butonu ────────────────────────────
   document.getElementById("btn-reset-filters").addEventListener("click", resetFilters);
+
+  // ── Tarih değişince otomatik DB'den yeniden çek (scraping yok) ───────────
+  onDateChange(async () => {
+    try {
+      const data = await fetchNews(getCurrentFilters());
+      loadNewsOnMap(data);
+      updateNewsCount(data.length);
+      setFooter(`${data.length} haber gösteriliyor`);
+    } catch(e) {
+      showToast("Filtre hatası: " + e.message, "error");
+    }
+  });
+
+  // ── Sayfa açılışında otomatik yükle ──────────────────
+  // Backend startup'ta scraping başlatıyor; frontend bunu takip edip
+  // tamamlanınca haberleri otomatik haritaya yükler.
+  (async function autoLoadOnStartup() {
+    try {
+      const r = await fetch("http://localhost:8000/api/scrape/status");
+      const j = await r.json();
+
+      if (j.in_progress) {
+        // Scraping devam ediyor — progress panelini göster ve bekle
+        setBusy(true);
+        pp.reset();
+        pp.show();
+        pp.step("step-scrape", "active");
+        setFooter("Otomatik scraping devam ediyor…");
+
+        await waitForScrapeFinish();
+        pp.step("step-scrape", "done");
+
+        // Haberleri çek ve haritaya yükle
+        pp.step("step-fetch", "active");
+        setFooter("Haritaya yükleniyor…");
+        const data = await fetchNews(getCurrentFilters());
+        loadNewsOnMap(data);
+        updateNewsCount(data.length);
+        pp.step("step-fetch", "done");
+        pp.spinner("done");
+        pp.title("Tamamlandı");
+        pp.result(`✓ ${data.length} haber yüklendi`);
+        setFooter(`${data.length} haber gösteriliyor`);
+        setTimeout(() => pp.hide(), 2800);
+        setBusy(false);
+
+      } else {
+        // Scraping bitti ya da hiç başlamadı — DB'de ne varsa direkt çek
+        const data = await fetchNews(getCurrentFilters());
+        if (data.length > 0) {
+          loadNewsOnMap(data);
+          updateNewsCount(data.length);
+          setFooter(`${data.length} haber gösteriliyor`);
+        }
+      }
+    } catch(e) {
+      // Sessizce geç — kullanıcı manuel butonla yükleyebilir
+      console.warn("Startup auto-load:", e.message);
+    }
+  })();
 
   // ── Legend chip toggle ───────────────────────────────
   // Chip → select DOM değeri + filters.js state senkronize.

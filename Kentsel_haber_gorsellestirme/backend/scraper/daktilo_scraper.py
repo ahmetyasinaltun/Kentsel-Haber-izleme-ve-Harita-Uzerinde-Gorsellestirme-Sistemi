@@ -26,10 +26,8 @@ ARTICLE_RE = re.compile(r"/haber/\d+/")
 class DaktiloScraper(BaseScraper):
     """cagdaskocaeli, ozgurkocaeli, seskocaeli, bizimyaka için ortak scraper."""
 
-    def __init__(self, site_name: str, base_url: str,
-                 max_news: int = 20, max_workers: int = 5):
+    def __init__(self, site_name: str, base_url: str, max_workers: int = 5):
         super().__init__(site_name=site_name, base_url=base_url)
-        self.max_news    = max_news
         self.max_workers = max_workers
 
     def get_news(self) -> list[dict]:
@@ -49,7 +47,7 @@ class DaktiloScraper(BaseScraper):
                 visited.add(full_url)
                 article_links.append(full_url)
 
-        article_links = article_links[:self.max_news]
+        # Limit yok — tüm linkler çekilir
         print(f"  📎 {self.site_name}: {len(article_links)} makale — "
               f"paralel çekiliyor ({self.max_workers} thread)")
 

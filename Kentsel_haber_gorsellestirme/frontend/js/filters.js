@@ -14,6 +14,13 @@ let _state = {
   date_to:   "",
 };
 
+let _onDateChange = null; // Tarih değişince çağrılacak callback
+
+// ─── Dışa açık: tarih değişim callback'i kaydet ──────────────────────────────
+export function onDateChange(fn) {
+  _onDateChange = fn;
+}
+
 // ─── İlklendirme ─────────────────────────────────────────────────────────────
 export async function initFilters() {
   const today        = new Date();
@@ -45,13 +52,21 @@ export async function initFilters() {
 
 // ─── Event bağlama ────────────────────────────────────────────────────────────
 function _bindEvents() {
-  ["filter-news-type","filter-district","filter-date-from","filter-date-to"]
-    .forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      // Sadece _state güncellenir — otomatik yükleme YOK
-      el.addEventListener("change", _syncState);
+  ["filter-news-type","filter-district"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("change", _syncState);
+  });
+
+  // Tarih filtreleri değişince state güncelle + callback tetikle
+  ["filter-date-from","filter-date-to"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("change", () => {
+      _syncState();
+      if (_onDateChange) _onDateChange();
     });
+  });
 }
 
 function _syncState() {
