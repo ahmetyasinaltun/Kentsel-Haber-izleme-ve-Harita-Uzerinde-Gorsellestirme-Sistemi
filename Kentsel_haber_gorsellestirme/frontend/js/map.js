@@ -8,7 +8,7 @@
 
 // ─── Kocaeli ve Komşuları İçin Güncellenmiş Koordinatlar ──────────────────────
 const KOCAELI_CENTER = { lat: 40.8532, lng: 29.8815 }; 
-const DEFAULT_ZOOM   = 1;   // İzmit merkezi net görecek seviye
+const DEFAULT_ZOOM   = 12;   // İzmit merkezi net görecek seviye
 
 const TYPE_CONFIG = {
   "Trafik Kazası":      { color: "#ef4444", emoji: "🚗" },
@@ -42,7 +42,7 @@ export function initMap(theme = "dark") {
   _map = new google.maps.Map(document.getElementById("map"), {
     center:            KOCAELI_CENTER,
     zoom:              DEFAULT_ZOOM,
-    minZoom:           1,    // Kullanıcının komşuları görebilmesi için düşürüldü
+    minZoom:           8,    // Tüm Kocaeli ili görünecek seviye
     maxZoom:           18,
     restriction:       BOUNDS,
     disableDefaultUI:  false,

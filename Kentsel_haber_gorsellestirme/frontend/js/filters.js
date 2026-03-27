@@ -14,12 +14,11 @@ let _state = {
   date_to:   "",
 };
 
-let _onDateChange = null; // Tarih değişince çağrılacak callback
+let _onDateChange   = null;
+let _onFilterChange = null; // tür/ilçe değişince
 
-// ─── Dışa açık: tarih değişim callback'i kaydet ──────────────────────────────
-export function onDateChange(fn) {
-  _onDateChange = fn;
-}
+export function onDateChange(fn)   { _onDateChange   = fn; }
+export function onFilterChange(fn) { _onFilterChange = fn; }
 
 // ─── İlklendirme ─────────────────────────────────────────────────────────────
 export async function initFilters() {
@@ -52,14 +51,18 @@ export async function initFilters() {
 
 // ─── Event bağlama ────────────────────────────────────────────────────────────
 function _bindEvents() {
-  ["filter-news-type","filter-district"].forEach(id => {
+  // Tür ve ilçe değişince state güncelle + auto-reload
+  ["filter-news-type", "filter-district"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener("change", _syncState);
+    el.addEventListener("change", () => {
+      _syncState();
+      if (_onFilterChange) _onFilterChange();
+    });
   });
 
-  // Tarih filtreleri değişince state güncelle + callback tetikle
-  ["filter-date-from","filter-date-to"].forEach(id => {
+  // Tarih değişince state güncelle + kendi callback'i
+  ["filter-date-from", "filter-date-to"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener("change", () => {

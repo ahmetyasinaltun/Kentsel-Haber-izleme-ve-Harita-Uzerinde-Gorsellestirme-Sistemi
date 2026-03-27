@@ -457,14 +457,6 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
       <button id="btn-reset-filters">↺ Filtreleri varsayılana döndür</button>
     </div>
 
-    <div id="legend-row">
-      <div class="legend-chip active" style="--chip-color:var(--c-kaza)"     data-type="Trafik Kazası">     <div class="chip-dot"></div>Kaza</div>
-      <div class="legend-chip active" style="--chip-color:var(--c-yangin)"   data-type="Yangın">            <div class="chip-dot"></div>Yangın</div>
-      <div class="legend-chip active" style="--chip-color:var(--c-elektrik)" data-type="Elektrik Kesintisi"><div class="chip-dot"></div>Elektrik</div>
-      <div class="legend-chip active" style="--chip-color:var(--c-hirsiz)"   data-type="Hırsızlık">         <div class="chip-dot"></div>Hırsızlık</div>
-      <div class="legend-chip active" style="--chip-color:var(--c-kultur)"   data-type="Kültürel Etkinlik"> <div class="chip-dot"></div>Etkinlik</div>
-    </div>
-
     <div id="news-list-wrap">
       <div id="news-list">
         <div class="empty-state">
@@ -533,7 +525,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 <script type="module">
   import { fetchNews, fetchFilterOptions, triggerScrape, deleteAllNews } from "./js/api.js";
   import { initFilters, updateNewsCount, getCurrentFilters,
-           resetFilters, setFilterNewsType, onDateChange } from "./js/filters.js";
+           resetFilters, onDateChange, onFilterChange } from "./js/filters.js";
   import { initMap, loadNewsOnMap, clearMarkers, setMapTheme } from "./js/map.js";
 
   // ── Tema ─────────────────────────────────────────────
@@ -776,26 +768,16 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     }
   })();
 
-  // ── Legend chip toggle ───────────────────────────────
-  // Chip → select DOM değeri + filters.js state senkronize.
-  // NOT: Otomatik yükleme tetiklenmez.
-  document.querySelectorAll(".legend-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      chip.classList.toggle("active");
-
-      const activeTypes = [...document.querySelectorAll(".legend-chip.active")]
-        .map(c => c.dataset.type);
-
-      // Sadece tek tür aktifse o filtre uygulanır, yoksa "Tüm Türler"
-      const selected = activeTypes.length === 1 ? activeTypes[0] : "";
-
-      // DOM select'i güncelle
-      const sel = document.getElementById("filter-news-type");
-      sel.value = selected;
-
-      // filters.js modül state'ini doğrudan güncelle
-      setFilterNewsType(selected);
-    });
+  // ── Tür / İlçe değişince otomatik yeniden çek ────────
+  onFilterChange(async () => {
+    try {
+      const data = await fetchNews(getCurrentFilters());
+      loadNewsOnMap(data);
+      updateNewsCount(data.length);
+      setFooter(`${data.length} haber gösteriliyor`);
+    } catch(e) {
+      showToast("Filtre hatası: " + e.message, "error");
+    }
   });
 </script>
 
