@@ -385,6 +385,20 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 }
 .iw-btn:hover { opacity:.85; }
 
+/* ── Cluster popup ───────────────────────────────── */
+.cl-wrap  { background:#0f1b2d; border-radius:12px; overflow:hidden; min-width:280px; max-width:340px; border:1px solid rgba(255,255,255,.07); }
+.cl-head  { padding:10px 16px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#00d4ff; letter-spacing:.1em; border-bottom:1px solid rgba(255,255,255,.07); }
+.cl-list  { max-height:320px; overflow-y:auto; padding:4px 0; scrollbar-width:thin; scrollbar-color:#1c2f48 transparent; }
+.cl-item  { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-bottom:1px solid rgba(255,255,255,.04); transition:background .15s; }
+.cl-item:last-child { border-bottom:none; }
+.cl-item:hover { background:rgba(255,255,255,.04); }
+.cl-emoji { font-size:16px; flex-shrink:0; margin-top:1px; }
+.cl-body  { flex:1; min-width:0; }
+.cl-title { font-family:'Syne',sans-serif; font-size:12px; font-weight:600; color:#d8e6f4; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.cl-meta  { font-family:'IBM Plex Mono',monospace; font-size:10px; color:#4a6880; margin-top:2px; }
+.cl-link  { flex-shrink:0; color:#00d4ff; font-size:14px; text-decoration:none; padding:2px 4px; align-self:center; }
+.cl-link:hover { color:#fff; }
+
 /* ═══════════════════════════════════════════════════
    RESPONSIVE & ANIMATIONS
 ═══════════════════════════════════════════════════ */
@@ -532,13 +546,17 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
   const savedTheme = localStorage.getItem("kh-theme") || "dark";
   document.documentElement.setAttribute("data-theme", savedTheme);
 
-  window.__initMapFn = () => initMap(savedTheme);
-  if (window.__mapReadyPending) {
-    window.__mapReadyPending = false;
-    initMap(savedTheme);
-    document.getElementById("map-loading").classList.add("hidden");
-    document.getElementById("footer-status").textContent = "Harita hazır";
-  }
+  // Harita hazır olduğunda resolve eden Promise
+  const mapReady = new Promise(resolve => {
+    const originalFn = () => { initMap(savedTheme); resolve(); };
+    window.__initMapFn = originalFn;
+    if (window.__mapReadyPending) {
+      window.__mapReadyPending = false;
+      originalFn();
+      document.getElementById("map-loading").classList.add("hidden");
+      document.getElementById("footer-status").textContent = "Harita hazır";
+    }
+  });
 
   document.getElementById("btn-theme").addEventListener("click", () => {
     const t = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -721,50 +739,51 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
   });
 
   // ── Sayfa açılışında otomatik yükle ──────────────────
-  // Backend startup'ta scraping başlatıyor; frontend bunu takip edip
-  // tamamlanınca haberleri otomatik haritaya yükler.
+  // 1. Harita hazır olsun
+  // 2. DB'de haber varsa direkt göster
+  // 3. DB boşsa scraping başlat, bitmesini bekle, göster
   (async function autoLoadOnStartup() {
     try {
-      const r = await fetch("http://localhost:8000/api/scrape/status");
-      const j = await r.json();
+      await mapReady;
 
-      if (j.in_progress) {
-        // Scraping devam ediyor — progress panelini göster ve bekle
-        setBusy(true);
-        pp.reset();
-        pp.show();
-        pp.step("step-scrape", "active");
-        setFooter("Otomatik scraping devam ediyor…");
+      // Her açılışta scraping başlat
+      setBusy(true);
+      pp.reset();
+      pp.show();
+      pp.title("Haberler Yükleniyor");
+      pp.step("step-scrape", "active");
+      setFooter("Haber siteleri taranıyor…");
 
-        await waitForScrapeFinish();
-        pp.step("step-scrape", "done");
-
-        // Haberleri çek ve haritaya yükle
-        pp.step("step-fetch", "active");
-        setFooter("Haritaya yükleniyor…");
-        const data = await fetchNews(getCurrentFilters());
-        loadNewsOnMap(data);
-        updateNewsCount(data.length);
-        pp.step("step-fetch", "done");
-        pp.spinner("done");
-        pp.title("Tamamlandı");
-        pp.result(`✓ ${data.length} haber yüklendi`);
-        setFooter(`${data.length} haber gösteriliyor`);
-        setTimeout(() => pp.hide(), 2800);
-        setBusy(false);
-
-      } else {
-        // Scraping bitti ya da hiç başlamadı — DB'de ne varsa direkt çek
-        const data = await fetchNews(getCurrentFilters());
-        if (data.length > 0) {
-          loadNewsOnMap(data);
-          updateNewsCount(data.length);
-          setFooter(`${data.length} haber gösteriliyor`);
-        }
+      try { await triggerScrape(); } catch(e) {
+        // 409 = zaten devam ediyor, sorun değil
+        if (!e.message.includes("409") && !e.message.includes("devam")) throw e;
       }
+
+      pp.step("step-pipeline", "active");
+      setFooter("Haberler işleniyor…");
+      await waitForScrapeFinish();
+      pp.step("step-scrape", "done");
+      pp.step("step-pipeline", "done");
+
+      pp.step("step-fetch", "active");
+      setFooter("Haritaya yükleniyor…");
+      const data = await fetchNews(getCurrentFilters());
+      loadNewsOnMap(data);
+      updateNewsCount(data.length);
+      pp.step("step-fetch", "done");
+      pp.spinner("done");
+      pp.title("Tamamlandı");
+      pp.result(`✓ ${data.length} haber yüklendi`);
+      setFooter(`${data.length} haber gösteriliyor`);
+      setTimeout(() => pp.hide(), 2800);
+      setBusy(false);
+
     } catch(e) {
-      // Sessizce geç — kullanıcı manuel butonla yükleyebilir
       console.warn("Startup auto-load:", e.message);
+      pp.spinner("err");
+      pp.title("Hata oluştu");
+      setBusy(false);
+      setTimeout(() => pp.hide(), 4000);
     }
   })();
 

@@ -9,7 +9,7 @@ from db.connection import get_db
 
 # Türkçe metinlerde iyi çalışan çok dilli model (384 boyutlu vektör)
 MODEL_NAME       = "paraphrase-multilingual-MiniLM-L12-v2"
-SIMILARITY_THRESHOLD = 0.90   # %90 ve üzeri → aynı haber
+SIMILARITY_THRESHOLD = 0.85   # %85 ve üzeri → aynı haber
 
 # Model bir kez yüklenir, her çağrıda tekrar yüklenmez
 _model = None
@@ -40,8 +40,8 @@ class Deduplicator:
         """
         Gelen article listesini işler:
           1. Önce link duplicate kontrolü (aynı URL → direkt atla)
-          2. Sonra embedding benzerlik kontrolü (≥%90 → aynı haber)
-             - Yeni haber ise: embedding hesapla, kaydet
+          2. Batch içi embedding benzerlik kontrolü (aynı turda gelen haberler)
+          3. DB'deki mevcut haberlerle embedding benzerlik kontrolü
              - Duplicate ise: mevcut haberin sources listesine ekle, haberi atla
 
         Dönen liste: MongoDB'ye kaydedilecek benzersiz haberler
@@ -50,31 +50,53 @@ class Deduplicator:
         duplicate = 0
         link_dup  = 0
 
-        # Yeni haberler için embedding'leri toplu hesapla (daha hızlı)
-        texts = [_make_text(a) for a in articles]
+        # Tüm embedding'leri toplu hesapla
+        texts      = [_make_text(a) for a in articles]
         embeddings = self.model.encode(texts, show_progress_bar=False)
+
+        # Batch içinde kabul edilen haberler (birbirleriyle karşılaştırmak için)
+        batch_accepted_embeddings = []  # np.ndarray listesi
+        batch_accepted_articles   = []  # unique listeye girenler
 
         for i, article in enumerate(articles):
             url = article["sources"][0]["url"]
 
-            # ── 1) Link duplicate kontrolü ──────────────────────────────── #
+            # ── 1) Link duplicate kontrolü (DB) ─────────────────────────── #
             if self._url_exists(url):
                 link_dup += 1
                 continue
 
-            # ── 2) Embedding benzerlik kontrolü ─────────────────────────── #
-            article["embedding"] = embeddings[i].tolist()
+            emb = embeddings[i]
+            article["embedding"] = emb.tolist()
 
-            existing_match = self._find_similar(embeddings[i])
+            # ── 2) Batch içi benzerlik kontrolü ─────────────────────────── #
+            batch_match = None
+            if batch_accepted_embeddings:
+                batch_matrix = np.array(batch_accepted_embeddings)
+                scores       = cosine_similarity([emb], batch_matrix)[0]
+                max_idx      = int(np.argmax(scores))
+                if float(scores[max_idx]) >= SIMILARITY_THRESHOLD:
+                    batch_match = batch_accepted_articles[max_idx]
 
-            if existing_match:
-                # Aynı haber farklı kaynakta → sources listesine ekle
-                self._add_source(existing_match["_id"], article["sources"][0])
+            if batch_match:
+                # Batch içinde aynı haber → kaynağı batch_match'e ekle
+                existing_sources = [s["url"] for s in batch_match.get("sources", [])]
+                if article["sources"][0]["url"] not in existing_sources:
+                    batch_match.setdefault("sources", []).append(article["sources"][0])
                 duplicate += 1
                 continue
 
-            # ── 3) Yeni haber → listeye ekle ────────────────────────────── #
+            # ── 3) DB'deki mevcut haberlerle benzerlik kontrolü ─────────── #
+            db_match = self._find_similar(emb)
+            if db_match:
+                self._add_source(db_match["_id"], article["sources"][0])
+                duplicate += 1
+                continue
+
+            # ── 4) Yeni benzersiz haber ──────────────────────────────────── #
             unique.append(article)
+            batch_accepted_embeddings.append(emb)
+            batch_accepted_articles.append(article)
 
         print(f"✅ Deduplicator: {len(unique)} yeni | "
               f"{duplicate} embedding duplicate | {link_dup} link duplicate")

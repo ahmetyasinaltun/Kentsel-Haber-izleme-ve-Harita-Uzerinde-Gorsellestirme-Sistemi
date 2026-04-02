@@ -6,9 +6,9 @@
  * YENİ: MarkerClusterer, Event Delegation ve Bellek Yönetimi eklendi.
  */
 
-// ─── Kocaeli ve Komşuları İçin Güncellenmiş Koordinatlar ──────────────────────
-const KOCAELI_CENTER = { lat: 40.8532, lng: 29.8815 }; 
-const DEFAULT_ZOOM   = 12;   // İzmit merkezi net görecek seviye
+// ─── Koordinatlar ────────────────────────────────────────────────────────────
+const IZMIT_CENTER = { lat: 40.7654, lng: 29.9408 };  // İzmit merkezi
+const DEFAULT_ZOOM = 12;
 
 const TYPE_CONFIG = {
   "Trafik Kazası":      { color: "#ef4444", emoji: "🚗" },
@@ -25,24 +25,24 @@ let _openWindow    = null;
 let _theme         = "dark";
 let _markerCluster = null; // Clusterer için global değişken
 
-// ─── Kocaeli ve komşularını kapsayan genişletilmiş kısıtlama ──────────────────
+// ─── Kocaeli kısıtlaması — strictBounds kapalı, minZoom ile sınır ────────────
 const BOUNDS = {
   latLngBounds: {
-    north: 41.30,   // Kefken / Karadeniz açıkları
-    south: 40.40,   // Karamürsel güneyi / İznik sınırları
-    west:  29.25,   // Gebze / İstanbul Tuzla sınırı
-    east:  30.60,   // Sakarya / Adapazarı sınırı
+    north: 41.50,
+    south: 40.20,
+    west:  29.00,
+    east:  31.00,
   },
-  strictBounds: true,
+  strictBounds: false,   // true iken bounds haritayı zoom out'tan kesiyor
 };
 
 // ─── Haritayı başlat ──────────────────────────────────────────────────────────
 export function initMap(theme = "dark") {
   _theme = theme;
   _map = new google.maps.Map(document.getElementById("map"), {
-    center:            KOCAELI_CENTER,
+    center:            IZMIT_CENTER,
     zoom:              DEFAULT_ZOOM,
-    minZoom:           8,    // Tüm Kocaeli ili görünecek seviye
+    minZoom:           9,    // Zoom 9 → tüm Kocaeli ili tek ekranda görünür
     maxZoom:           18,
     restriction:       BOUNDS,
     disableDefaultUI:  false,
@@ -87,14 +87,52 @@ export function loadNewsOnMap(newsList) {
     googleMarkers.push(marker);
   });
 
-  // Marker Clusterer'ı başlat (Harita uzaklaştıkça marker'ları gruplar)
+  // Marker Clusterer — tıklamada zoom yerine haber listesi popup'ı
   if (typeof markerClusterer !== 'undefined') {
-    _markerCluster = new markerClusterer.MarkerClusterer({ 
-        map: _map, 
-        markers: googleMarkers 
+    _markerCluster = new markerClusterer.MarkerClusterer({
+      map: _map,
+      markers: googleMarkers,
+      onClusterClick: (event, cluster, map) => {
+        if (_openWindow) { _openWindow.close(); _openWindow = null; }
+
+        // Cluster içindeki marker'ların news verilerini bul
+        const clusterMarkers = cluster.markers || [];
+        const clusterNews = clusterMarkers
+          .map(m => _markers.find(x => x.marker === m))
+          .filter(Boolean)
+          .map(x => x.news);
+
+        if (!clusterNews.length) return;
+
+        // Tüm haberleri listeleyen InfoWindow
+        const rows = clusterNews.map(n => {
+          const cfg  = TYPE_CONFIG[n.news_type] || DEFAULT_CONFIG;
+          const url  = n.sources?.[0]?.url || '#';
+          const date = n.published_at
+            ? new Date(n.published_at).toLocaleDateString('tr-TR', { day:'2-digit', month:'short' })
+            : '';
+          return `<div class="cl-item">
+            <span class="cl-emoji">${cfg.emoji}</span>
+            <div class="cl-body">
+              <div class="cl-title">${_esc(n.title)}</div>
+              <div class="cl-meta">${date}${n.location_text ? ' · ' + _esc(n.location_text) : ''}</div>
+            </div>
+            <a class="cl-link" href="${url}" target="_blank" rel="noopener">→</a>
+          </div>`;
+        }).join('');
+
+        const html = `<div class="cl-wrap">
+          <div class="cl-head">${clusterNews.length} Haber</div>
+          <div class="cl-list">${rows}</div>
+        </div>`;
+
+        const center = cluster.position || clusterMarkers[0].getPosition();
+        _openWindow = new google.maps.InfoWindow({ content: html, maxWidth: 360, position: center });
+        _openWindow.open(map);
+      },
     });
   } else {
-    console.warn("MarkerClusterer kütüphanesi bulunamadı. Lütfen HTML dosyanıza ekleyin.");
+    console.warn("MarkerClusterer kütüphanesi bulunamadı.");
   }
 
   _renderSidebar(newsList);

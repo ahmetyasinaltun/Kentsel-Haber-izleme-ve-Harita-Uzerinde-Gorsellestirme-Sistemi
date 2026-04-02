@@ -1,5 +1,4 @@
 # main.py — FastAPI uygulama giriş noktası
-import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,12 +22,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     test_connection()
-
-    # Her başlatmada scraping yap (arka planda, startup'ı bloklamaz)
-    print("🔄 Uygulama başlatıldı — otomatik scraping başlıyor...")
-    from api.routes import run_scraping_pipeline
-    thread = threading.Thread(target=run_scraping_pipeline, daemon=True)
-    thread.start()
+    print("✅ Backend hazır — scraping index.html açılışında başlayacak.")
 
 
 app.include_router(router, prefix="/api")

@@ -44,11 +44,22 @@ class YeniKocaeliScraper(BaseScraper):
         article_links = []
         lock = __import__("threading").Lock()
 
-        # Kategori sayfalarını paralel çek — Lock ile thread-safe
+        # Kategori sayfalarını paralel çek — hafif requests session, cloudscraper değil
         def fetch_category(cat_url):
-            soup = self.fetch_page(cat_url)
-            if not soup:
-                print(f"  ⚠️  {cat_url} alınamadı")
+            import requests as _req
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) "
+                              "Chrome/122.0.0.0 Safari/537.36",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            }
+            try:
+                r = _req.get(cat_url, headers=headers, timeout=20, allow_redirects=True)
+                r.raise_for_status()
+                from bs4 import BeautifulSoup as _BS
+                soup = _BS(r.text, "html.parser")
+            except Exception as e:
+                print(f"  ⚠️  {cat_url} alınamadı: {e}")
                 return []
             links = []
             for a in soup.find_all("a", href=True):
