@@ -10,24 +10,11 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_GEOCODING_API_KEY")
 GEOCODING_URL  = "https://maps.googleapis.com/maps/api/geocode/json"
 
-# ─── Kocaeli ili gerçek sınırları ────────────────────────────────────────────
-# Batı: Gebze/Darıca ~29.25   Doğu: Kandıra/Karamürsel ~30.80
-# Kuzey: Karadeniz kıyısı ~41.10   Güney: Gölcük/Karamürsel ~40.45
-#
-# Eski hatalı değer → lng_min: 29.50  (Gebze, Darıca, Çayırova dışarıda kalıyordu)
-# Doğru değer       → lng_min: 29.20
-#
-# İlçe referans koordinatları (kontrol için):
-#   Gebze:   40.8025, 29.4313
-#   Darıca:  40.7647, 29.3733
-#   Çayırova: 40.8383, 29.3947
-#   İzmit:   40.7654, 29.9408
-#   Kandıra: 41.0742, 30.1537
-#   Karamürsel: 40.6957, 29.6075
+
 KOCAELI_BOUNDS = {
     "lat_min": 40.45,
     "lat_max": 41.15,
-    "lng_min": 29.20,   # ← DÜZELTİLDİ (eski: 29.50)
+    "lng_min": 29.20,   
     "lng_max": 30.85,
 }
 

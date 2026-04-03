@@ -1,6 +1,4 @@
-# yenikocaeli.com scraper
-# URL formatı: haber/{kategori}/{slug}/{ID}.html
-# İçerik: div.news > p  (debug ile doğrulandı)
+
 
 import re
 from datetime import datetime
@@ -34,9 +32,8 @@ CATEGORY_PAGES = [
 
 
 class YeniKocaeliScraper(BaseScraper):
-    def __init__(self, max_news: int = 20, max_workers: int = 5):
+    def __init__(self, max_workers: int = 5):
         super().__init__(site_name="yenikocaeli.com", base_url=BASE_URL)
-        self.max_news    = max_news
         self.max_workers = max_workers
 
     def get_news(self) -> list[dict]:
@@ -44,7 +41,7 @@ class YeniKocaeliScraper(BaseScraper):
         article_links = []
         lock = __import__("threading").Lock()
 
-        # Kategori sayfalarını paralel çek — hafif requests session, cloudscraper değil
+        
         def fetch_category(cat_url):
             import requests as _req
             headers = {
@@ -97,7 +94,6 @@ class YeniKocaeliScraper(BaseScraper):
                             visited.add(full_url)
                             article_links.append(full_url)
 
-        article_links = article_links[:self.max_news]
         print(f"  📎 {self.site_name}: {len(article_links)} makale — "
               f"paralel çekiliyor ({self.max_workers} thread)")
 
@@ -126,10 +122,10 @@ class YeniKocaeliScraper(BaseScraper):
             if not title or len(title) < 10:
                 return None
 
-            # debug ile doğrulandı: içerik div.news içindeki <p> tag'larında
+            
             content_tag = soup.find("div", class_="news")
             if not content_tag:
-                # yedek selektörler
+                
                 content_tag = (
                     soup.find("div", class_=lambda c: c and "news" in c.split()) or
                     soup.find("div", class_="detay") or

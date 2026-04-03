@@ -7,29 +7,86 @@ import re
 DISTRICTS = [
     "İzmit", "Izmit", "Gebze", "Körfez", "Korfez", "Darıca", "Darica",
     "Çayırova", "Cayirova", "Dilovası", "Dilovasi", "Gölcük", "Golcuk",
-    "Kandıra", "Kandira", "Karamürsel", "Karamursel", "Kartepe",
+    "Kandıra", "Kandira", "Karamürsel", "Karamursel", "Kartepe", "Derince",
     "Başiskele", "Basiskele", "İzmit Merkez",
 ]
 
-# ── Sık geçen mahalle ve semt adları ─────────────────────────────────────── #
-# Ne kadar çok eklersen o kadar iyi — sahadan ekleyebilirsin
-NEIGHBORHOODS = [
-    # İzmit mahalleleri
-    "Yahya Kaptan", "Kuruçeşme", "Kurucesme", "Kozluk", "Yenidoğan", "Yenidogan",
-    "Bekirdere", "Çukurbağ", "Çukurbag", "Orhan", "Serdar", "Durhasan",
-    "Turgut", "Hacıhasan", "Hacihasan", "Gündoğdu", "Gundogdu", "Yeniköy", "Yenikoy",
-    "Nişantepe", "Nisantepe", "Akçaray", "Akcaray", "Tavşantepe", "Tavsantepe",
-    "Ömerağa", "Omeraga", "Alemdar", "Arızlı", "Arizli",
-    # Gebze mahalleleri
-    "Güzeller", "Guzeller", "Pelitli", "Çoban Çeşme", "Çoban Cesme",
-    "Kullar", "Tavşanlı", "Tavsanli", "Balçık", "Balcik",
-    # Körfez / Gölcük
-    "Denizçalı", "Denizcali", "Köseköy", "Kosekoy", "Kaletaşı", "Kaletasi",
-    "Sekapark", "Izmit Merkez",
-    # Diğer
-    "Bağçeşme", "Bagcesme", "Hisareyn", "Nüzhetiye", "Nuzhetiye",
-    "Kazandere", "Serindere", "Ayvazpınar", "Ayvazpinar",
-]
+# ── Mahalle → İlçe eşleştirme tablosu (tek kaynak) ───────────────────────── #
+# Hem NEIGHBORHOODS listesi hem de _guess_district buradan türetilir.
+LOCATION_MAPPING = {
+    # İZMİT
+    "Yahya Kaptan": "İzmit", "Yahyakaptan": "İzmit", "Kuruçeşme": "İzmit",
+    "Kurucesme": "İzmit", "Kozluk": "İzmit", "Yenidoğan": "İzmit", "Yenidogan": "İzmit",
+    "Bekirdere": "İzmit", "Çukurbağ": "İzmit", "Cukurbag": "İzmit", "Orhan": "İzmit",
+    "Serdar": "İzmit", "Durhasan": "İzmit", "Turgut": "İzmit", "Hacıhasan": "İzmit",
+    "Gündoğdu": "İzmit", "Gundogdu": "İzmit", "Nişantepe": "İzmit", "Nisantepe": "İzmit",
+    "Tavşantepe": "İzmit", "Tavsantepe": "İzmit", "Ömerağa": "İzmit", "Omeraga": "İzmit",
+    "Alemdar": "İzmit", "Arızlı": "İzmit", "Arizli": "İzmit", "Cedit": "İzmit",
+    "Doğan": "İzmit", "Erenler": "İzmit", "Gültepe": "İzmit", "Yenişehir": "İzmit",
+    "Yeşilova": "İzmit", "Alikahya": "İzmit", "Akmeşe": "İzmit", "Tepeköy": "İzmit",
+    "Topçular": "İzmit", "Tüysüzler": "İzmit", "Şirintepe": "İzmit", "Zabıtan": "İzmit",
+    "Kadıköy": "İzmit", "Karabaş": "İzmit", "Sanayi": "İzmit", "Sekapark": "İzmit",
+    "Akçaray": "İzmit", "Bağçeşme": "İzmit", "Fethiye": "İzmit",
+    # GEBZE
+    "Arapçeşme": "Gebze", "Osman Yılmaz": "Gebze", "Köşklüçeşme": "Gebze",
+    "Köşklü Çeşme": "Gebze", "Gaziler": "Gebze", "Güzeller": "Gebze", "Guzeller": "Gebze",
+    "Mustafapaşa": "Gebze", "Mevlana": "Gebze", "Yenikent": "Gebze", "Tatlıkuyu": "Gebze",
+    "İstasyon": "Gebze", "Barış": "Gebze", "Mimar Sinan": "Gebze", "Ulus": "Gebze",
+    "Adem Yavuz": "Gebze", "Beylikbağı": "Gebze", "Sultan Orhan": "Gebze", "Hürriyet": "Gebze",
+    "Yavuz Selim": "Gebze", "Hacıhalil": "Gebze", "Kirazpınar": "Gebze",
+    "Cumaköy": "Gebze", "Balçık": "Gebze", "Balcik": "Gebze", "Pelitli": "Gebze",
+    "Tavşanlı": "Gebze", "Tavsanli": "Gebze", "Muallimköy": "Gebze", "Ovacık": "Gebze",
+    # ÇAYIROVA
+    "Şekerpınar": "Çayırova", "Sekerpinar": "Çayırova", "Akse": "Çayırova",
+    "Özgürlük": "Çayırova", "Ozgurluk": "Çayırova", "Emek": "Çayırova",
+    "İnönü": "Çayırova", "Inonu": "Çayırova", "Yeni Mahalle": "Çayırova",
+    "Yenimahalle": "Çayırova",
+    # DARICA
+    "Bayramoğlu": "Darıca", "Bayramoglu": "Darıca", "Bağlarbaşı": "Darıca",
+    "Baglarbasi": "Darıca", "Nenehatun": "Darıca", "Osmangazi": "Darıca",
+    "Sırasöğütler": "Darıca", "Sirasogutler": "Darıca", "Abdi İpekçi": "Darıca",
+    "Fevziçakmak": "Darıca", "Kazımkarabekir": "Darıca", "Piri Reis": "Darıca",
+    "Yalı": "Darıca",
+    # DİLOVASI
+    "Diliskelesi": "Dilovası", "Tavşancıl": "Dilovası", "Tavsancil": "Dilovası",
+    "Çerkeşli": "Dilovası", "Cerkesli": "Dilovası", "Demirciler": "Dilovası",
+    "Köseler": "Dilovası", "Kayapınar": "Dilovası", "Orhangazi": "Dilovası",
+    # BAŞİSKELE
+    "Kullar": "Başiskele", "Yeniköy": "Başiskele", "Yenikoy": "Başiskele",
+    "Karşıyaka": "Başiskele", "Yuvacık": "Başiskele", "Döngel": "Başiskele",
+    "Seymen": "Başiskele", "Bahçecik": "Başiskele", "Barbaros": "Başiskele",
+    "Kılıçarslan": "Başiskele", "Yeşilyurt": "Başiskele",
+    # GÖLCÜK
+    "Değirmendere": "Gölcük", "Halıdere": "Gölcük", "Ulaşlı": "Gölcük",
+    "Şirinköy": "Gölcük", "Çiftlik": "Gölcük", "Hisareyn": "Gölcük",
+    "Nüzhetiye": "Gölcük", "Nuzhetiye": "Gölcük", "İhsaniye": "Gölcük",
+    "Yazlık": "Gölcük", "Kavaklı": "Gölcük", "Piyalepaşa": "Gölcük",
+    "Saraylı": "Gölcük", "Örcün": "Gölcük", "Denizçalı": "Gölcük",
+    "Denizcali": "Gölcük", "Donanma": "Gölcük",
+    # KARTEPE
+    "Köseköy": "Kartepe", "Kosekoy": "Kartepe", "Ataevler": "Kartepe",
+    "Suadiye": "Kartepe", "Maşukiye": "Kartepe", "Derbent": "Kartepe",
+    "Arslanbey": "Kartepe", "Uzunçiftlik": "Kartepe", "Uzuntarla": "Kartepe",
+    "Sarımeşe": "Kartepe", "Acısu": "Kartepe", "Eşme": "Kartepe",
+    # KÖRFEZ
+    "Çamlıtepe": "Körfez", "Yeniyalı": "Körfez", "Hereke": "Körfez",
+    "Kaletaşı": "Körfez", "Yarımca": "Körfez", "Tütünçiftlik": "Körfez",
+    "Körfez Kent": "Körfez", "Kuzey Mahallesi": "Körfez", "Güney Mahallesi": "Körfez",
+    "Mimar Sinan Mahallesi": "Körfez",
+    # DERİNCE
+    "Çenedağ": "Derince", "Sırrıpaşa": "Derince", "Çınarlı": "Derince",
+    "İbni Sina": "Derince", "Yavuz Sultan": "Derince", "Dumlupınar": "Derince",
+    # KARAMÜRSEL
+    "Ereğli": "Karamürsel", "Eregli": "Karamürsel", "4 Temmuz": "Karamürsel",
+    "Kayacık": "Karamürsel", "Dereköy": "Karamürsel",
+    # ORTAK İSİMLER
+    "Fatih": "Gebze",
+    "Cumhuriyet": "İzmit",
+    "Atatürk": "Çayırova",
+}
+
+# NEIGHBORHOODS: LOCATION_MAPPING'den otomatik türetilir — ayrıca bakım gerekmez
+NEIGHBORHOODS = list(LOCATION_MAPPING.keys())
 
 # ── Sokak / cadde / bulvar / meydan regex kalıpları ──────────────────────── #
 STREET_PATTERN = re.compile(
@@ -46,112 +103,85 @@ CONTEXT_PATTERN = re.compile(
 
 
 class LocationExtractor:
-    def extract(self, article: dict) -> dict:
+    def _find_location(self, text: str, title: str = ""):
         """
-        article["location_text"] ve article["district"] alanlarını doldurur.
-        Konum bulunamazsa her ikisi de None kalır.
-        """
-        text = (article.get("title", "") + " " + article.get("content", ""))
-
-        location_text, district = self._find_location(text)
-
-        article["location_text"] = location_text
-        article["district"]      = district
-        return article
-
-    def _find_location(self, text: str):
-        """
-        En spesifik konumdan başlayarak arar:
-          1. Mahalle / semt adı  → en spesifik
-          2. Sokak / cadde regex
-          3. Bağlam kalıpları ("X mahallesinde")
-          4. İlçe adı            → en genel
-        Bulunan konum + ilçe çifti döner. Hiçbiri bulunamazsa (None, None).
+        Öncelik sırası:
+          1. Bağlam kalıpları (Örn: "Başiskele ilçesinde" -> En kesin sonuç)
+          2. Başlıkta geçen ilçe adı (Başlıklar genelde olayın yerini vurgular)
+          3. Mahalle / semt eşleşmesi
+          4. Metin içinde geçen rastgele ilçe adı
         """
         found_location = None
         found_district = None
 
-        # 1) Mahalle adı ara
-        for neighborhood in NEIGHBORHOODS:
-            if re.search(re.escape(neighborhood), text, re.IGNORECASE):
-                found_location = neighborhood
-                break
+        # 1) Bağlam Kalıpları ("Başiskele ilçesinde") - En güvenilir!
+        match = CONTEXT_PATTERN.search(text)
+        if match:
+            found_location = match.group(1).strip()
+            # Eğer bulunan konum bir ilçe ise doğrudan ata
+            for d in DISTRICTS:
+                if d.lower() in found_location.lower():
+                    found_district = d
+                    break
 
-        # 2) Sokak / cadde / bulvar regex
+        # 2) Başlıkta İlçe Kontrolü (Haber gövdesindeki İzmit'e aldanmamak için)
+        if not found_district and title:
+            for district in DISTRICTS:
+                if re.search(r'\b' + re.escape(district) + r'\b', title, re.IGNORECASE):
+                    found_district = district
+                    break
+
+        # 3) Mahalle adı ara (LOCATION_MAPPING üzerinden)
+        if not found_district:
+            for neighborhood, district in LOCATION_MAPPING.items():
+                if re.search(r'\b' + re.escape(neighborhood) + r'\b', text, re.IGNORECASE):
+                    found_location = neighborhood
+                    found_district = district
+                    break
+
+        # 4) Sadece İlçe adı ara (Gövdede)
+        if not found_district:
+            for district in DISTRICTS:
+                if re.search(r'\b' + re.escape(district) + r'\b', text, re.IGNORECASE):
+                    found_district = district
+                    break
+
+        # Sokak/Cadde regex'i (Mahalle bulunamadıysa)
         if not found_location:
             match = STREET_PATTERN.search(text)
             if match:
                 found_location = match.group(1).strip()
 
-        # 3) Bağlam kalıpları ("Yahya Kaptan Mahallesinde")
-        if not found_location:
-            match = CONTEXT_PATTERN.search(text)
-            if match:
-                found_location = match.group(1).strip()
-
-        # 4) İlçe adı ara (her durumda — district alanını doldurmak için)
-        for district in DISTRICTS:
-            if re.search(r'\b' + re.escape(district) + r'\b', text, re.IGNORECASE):
-                found_district = district
-                break
-
-        # Konum bulunduysa ama ilçe bulunmadıysa → location_text'i ilçe olarak da kullan
-        if found_location and not found_district:
-            found_district = self._guess_district(found_location)
-
-        # İlçe varsa location_text'e ekle (yoksa sadece mahalle adı kalır)
+        # Formatlama
         if found_location and found_district:
-            # Zaten ilçe adı içeriyorsa tekrar ekleme
             if found_district.lower() not in found_location.lower():
                 found_location = f"{found_location}, {found_district}"
 
-        # Sadece ilçe bulunduysa location_text = ilçe adı
         if not found_location and found_district:
             found_location = found_district
 
         return found_location, found_district
 
-    def _guess_district(self, location_text: str) -> str | None:
-        """Mahalle adından ilçeyi tahmin et (bilinen eşleşmeler)."""
-        izmit_neighborhoods = [
-            "Yahya Kaptan", "Kuruçeşme", "Kurucesme", "Yenidoğan", "Yenidogan",
-            "Bekirdere", "Durhasan", "Gündoğdu", "Gundogdu", "Serdar",
-            "Nişantepe", "Nisantepe", "Alemdar", "Ömerağa", "Omeraga",
-            "Sekapark",
-        ]
-        gebze_neighborhoods = [
-            "Güzeller", "Guzeller", "Pelitli", "Kullar", "Balçık", "Balcik",
-        ]
-        gölcük_neighborhoods = [
-            "Denizçalı", "Denizcali", "Hisareyn", "Nüzhetiye", "Nuzhetiye",
-        ]
-
-        loc_lower = location_text.lower()
-        if any(n.lower() in loc_lower for n in izmit_neighborhoods):
-            return "İzmit"
-        if any(n.lower() in loc_lower for n in gebze_neighborhoods):
-            return "Gebze"
-        if any(n.lower() in loc_lower for n in gölcük_neighborhoods):
-            return "Gölcük"
-        return None
+    def extract(self, article: dict) -> dict:
+        title = article.get("title", "")
+        content = article.get("content", "")
+        text = title + " " + content
+        
+        # Fonksiyona başlığı da parametre olarak gönderiyoruz
+        location_text, district = self._find_location(text, title)
+        
+        article["location_text"] = location_text
+        article["district"]      = district
+        return article
 
 
 def extract_locations(articles: list[dict]) -> list[dict]:
-    """
-    Tüm article listesi için konum çıkarımı yapar.
-
-    Kullanım:
-        from pipeline.location_extractor import extract_locations
-        articles = extract_locations(articles)
-    """
     extractor = LocationExtractor()
     found = 0
-
     for article in articles:
         extractor.extract(article)
         if article.get("location_text"):
             found += 1
-
     print(f"✅ LocationExtractor: {len(articles)} haberden {found} tanesinde konum bulundu")
     print(f"   ⚠️  {len(articles) - found} haberde konum bulunamadı → haritada gösterilmeyecek")
     return articles

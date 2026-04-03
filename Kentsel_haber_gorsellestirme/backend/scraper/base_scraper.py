@@ -10,7 +10,7 @@ class BaseScraper:
     def __init__(self, site_name: str, base_url: str):
         self.site_name = site_name
         self.base_url  = base_url
-        # Her instance için taze session — encoding'e kesinlikle dokunma
+       
         self._session  = cloudscraper.create_scraper(
             browser={"browser": "chrome", "platform": "windows", "mobile": False}
         )
@@ -22,7 +22,7 @@ class BaseScraper:
             try:
                 r = self._session.get(url, timeout=timeout, allow_redirects=True)
                 r.raise_for_status()
-                # r.text'e encoding atama — cloudscraper zaten doğru decode ediyor
+                
                 soup  = BeautifulSoup(r.text, "html.parser")
                 links = soup.find_all("a", href=True)
                 if len(links) < 5 and attempt < retries:
@@ -42,8 +42,7 @@ class BaseScraper:
         time.sleep(base + random.uniform(0.2, 0.8))
 
     def is_recent(self, published_at: datetime, days: int = 3) -> bool:
-        # Gün başlangıcı bazlı: bugün dahil geriye doğru `days` gün
-        # Örn: bugün 21 → 18, 19, 20, 21 dahil (18'in 00:00'ından itibaren)
+        
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         cutoff = today_start - timedelta(days=days - 1)
         return published_at >= cutoff

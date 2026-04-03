@@ -73,7 +73,7 @@ def run_scraping_pipeline():
         print(f"🚀 Scraping başladı — {len(scrapers)} site PARALEL çalışıyor")
         print("=" * 55)
 
-        # ── 4 site aynı anda ────────────────────────────────────
+        # ── 5 site aynı anda ────────────────────────────────────
         raw_all = []
         scrape_start = time.time()
         with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
@@ -194,9 +194,34 @@ def get_single_news(news_id: str):
 
 @router.get("/filter/options", summary="Filtre dropdown seçenekleri")
 def filter_options():
-    from db.connection import news_collection
-    news_types = sorted([t for t in news_collection().distinct("news_type") if t])
-    districts  = sorted([d for d in news_collection().distinct("district")  if d])
+    """
+    Filtre seçeneklerini statik olarak döndürür.
+    Böylece veritabanı boş olsa bile (Cold Start problemi) 
+    arayüzde filtreler her zaman eksiksiz görünür.
+    """
+    news_types = [
+        "Elektrik Kesintisi",
+        "Hırsızlık",
+        "Kültürel Etkinlikler",
+        "Trafik Kazası",
+        "Yangın"
+    ]
+    
+    districts = [
+        "Başiskele",
+        "Çayırova",
+        "Darıca",
+        "Derince",
+        "Dilovası",
+        "Gebze",
+        "Gölcük",
+        "İzmit",
+        "Kandıra",
+        "Karamürsel",
+        "Kartepe",
+        "Körfez"
+    ]
+    
     return {"news_types": news_types, "districts": districts}
 
 

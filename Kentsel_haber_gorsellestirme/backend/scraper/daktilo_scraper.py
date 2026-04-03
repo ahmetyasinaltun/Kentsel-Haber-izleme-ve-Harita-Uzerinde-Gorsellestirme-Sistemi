@@ -1,6 +1,4 @@
-# Daktilo CMS tabanlı Kocaeli haber siteleri için ortak scraper
-# cagdaskocaeli, ozgurkocaeli, seskocaeli, bizimyaka
-# Optimizasyon: makaleler ThreadPoolExecutor ile paralel çekilir
+
 
 import re
 from datetime import datetime

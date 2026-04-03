@@ -1,21 +1,14 @@
-/**
- * map.js — Google Maps entegrasyonu
- *
- * ÖNEMLİ: AdvancedMarkerElement KULLANILMIYOR (Map ID gerektirir).
- * Legacy google.maps.Marker + custom SVG icon kullanılıyor.
- * YENİ: MarkerClusterer, Event Delegation ve Bellek Yönetimi eklendi.
- */
 
 // ─── Koordinatlar ────────────────────────────────────────────────────────────
 const IZMIT_CENTER = { lat: 40.7654, lng: 29.9408 };  // İzmit merkezi
 const DEFAULT_ZOOM = 12;
 
 const TYPE_CONFIG = {
-  "Trafik Kazası":      { color: "#ef4444", emoji: "🚗" },
+  "Trafik Kazası":      { color: "#ef4444", emoji: "💥" },
   "Yangın":             { color: "#f97316", emoji: "🔥" },
   "Elektrik Kesintisi": { color: "#facc15", emoji: "⚡" },
   "Hırsızlık":          { color: "#a855f7", emoji: "🦹" },
-  "Kültürel Etkinlik":  { color: "#22d3ee", emoji: "🎭" },
+  "Kültürel Etkinlikler":  { color: "#22d3ee", emoji: "🎭" },
 };
 const DEFAULT_CONFIG = { color: "#64748b", emoji: "📰" };
 
@@ -23,9 +16,9 @@ let _map           = null;
 let _markers       = [];
 let _openWindow    = null;
 let _theme         = "dark";
-let _markerCluster = null; // Clusterer için global değişken
+let _markerCluster = null; 
 
-// ─── Kocaeli kısıtlaması — strictBounds kapalı, minZoom ile sınır ────────────
+
 const BOUNDS = {
   latLngBounds: {
     north: 41.50,
@@ -33,7 +26,7 @@ const BOUNDS = {
     west:  29.00,
     east:  31.00,
   },
-  strictBounds: false,   // true iken bounds haritayı zoom out'tan kesiyor
+  strictBounds: false,  
 };
 
 // ─── Haritayı başlat ──────────────────────────────────────────────────────────
@@ -42,7 +35,7 @@ export function initMap(theme = "dark") {
   _map = new google.maps.Map(document.getElementById("map"), {
     center:            IZMIT_CENTER,
     zoom:              DEFAULT_ZOOM,
-    minZoom:           9,    // Zoom 9 → tüm Kocaeli ili tek ekranda görünür
+    minZoom:           9,    
     maxZoom:           18,
     restriction:       BOUNDS,
     disableDefaultUI:  false,
@@ -70,7 +63,7 @@ export function loadNewsOnMap(newsList) {
   clearMarkers();
   if (!newsList.length) { _renderSidebar([]); return; }
 
-  const googleMarkers = []; // Clusterer'a geçilecek ham marker dizisi
+  const googleMarkers = []; 
 
   newsList.forEach((news, idx) => {
     if (!news.location_coords?.lat || !news.location_coords?.lng) return;
@@ -195,14 +188,14 @@ function _createMarker(news, cfg) {
   });
 }
 
-// ─── Sidebar listesi (Event Delegation ile optimize edildi) ───────────────────
+
 function _renderSidebar(newsList) {
   const container = document.getElementById("news-list");
   if (!container) return;
 
   if (!newsList.length) {
     container.innerHTML = `<div class="no-news">Filtrelerle eşleşen haber bulunamadı.</div>`;
-    // Önceki event listener'ları temizlemek için onClick'i sıfırlıyoruz
+    
     container.onclick = null;
     container.onkeydown = null;
     return;
@@ -230,8 +223,7 @@ function _renderSidebar(newsList) {
       </div>`;
   }).join("");
 
-  // Event Delegation: Tüm öğelere ayrı ayrı dinleyici eklemek yerine 
-  // ana kapsayıcı üzerinden tıklamaları yakalıyoruz. (Performans Optimizasyonu)
+
   const handleItemInteraction = (target) => {
     const el = target.closest(".news-item.has-coords");
     if (!el) return;

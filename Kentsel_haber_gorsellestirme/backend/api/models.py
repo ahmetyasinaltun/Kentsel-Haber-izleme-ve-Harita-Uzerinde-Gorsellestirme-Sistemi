@@ -1,1 +1,1 @@
-# Pydantic şemaları
+

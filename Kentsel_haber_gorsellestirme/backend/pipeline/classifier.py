@@ -1,66 +1,153 @@
 import re
 
 # ── 1. GENEL NEGATİF KELİMELER (Context Killers) ─────────────────────────── #
-# Bu kelimeler geçiyorsa, haber muhtemelen siyaset, şikayet, açılış veya TV programıdır.
-# Sıcak bir "olay/asayiş" haberi olma ihtimali çok düşüktür. Tüm kategoriler için skoru sıfırlar.
+
+
 GLOBAL_NEGATIVE_KEYWORDS = [
-    "değerlendirdi", "açılış", "proje", "tepki", "milletvekili", 
-    "soru önergesi", "meclis", "tv'de", "konuk", "açıklama yaptı", 
-    "basın toplantısı", "gündemine taşıdı", "röportaj", "eleştirdi",
-    "önerge", "ziyaret etti", "faaliyete geçti"
+    "soru önergesi", "tbmm", "gündemine taşıdı", "önerge",
+    "basın toplantısı", "basın açıklaması", "siyasi parti", "parti binası",
+    "aday adayı", "seçim çalışması", "il binası",
+    "mahkeme", "duruşma",
+    "yatırım", "proje", "altyapı", "üstyapı",
+    "ihale", "açılış töreni", "temel atma",
+    "tanıtım", "kampanya", "duyuru"
 ]
 
-# ── 2. KATEGORİ BAZLI NEGATİF KELİMELER ──────────────────────────────────── #
-# Sadece o kategoriye özel yanlış anlaşılmaları engeller. (Örn: "yangın çıksa", "itfaiye giremez")
+
+# ── 2. KATEGORİ BAZLI NEGATİF KELİMELER ── #
+
 NEGATIVE_KEYWORDS = {
-    "Yangın": [
-        "tatbikat", "film", "sinema", "dizi", "roman", "şarkı", "klip", 
-        "yangın çıksa", "olası bir yangın", "itfaiye giremez", "itfaiye aracı giremedi",
-        "yangın merdiveni", "hidrant", "yangın tüpü", "yangın dolabı"
-    ],
-    "Trafik Kazası": ["tatbikat", "simülasyon", "film", "dizi", "oyun", "şaka", "kaza yapsa"],
-    "Hırsızlık": ["film", "dizi", "senaryo", "oyun", "tiyatro", "şaka"],
-    "Elektrik Kesintisi": ["planlı kesinti duyurusu", "ihale", "fatura", "ödeme", "abonelik"],
-    "Kültürel Etkinlik": ["iptal edildi", "ertelendi", "tepki"]
-}
 
-# ── 3. ANAHTAR KELİMELER ─────────────────────────────────────────────────── #
-KEYWORDS = {
     "Yangın": [
-        "yangın", "alev aldı", "itfaiye", "ev yandı", "araç yandı", 
-        "bina yandı", "fabrika yandı", "tutuştu", "duman çıktı", 
-        "orman yangını", "kül oldu", "alevlere teslim", "söndürme çalışması"
+        "tatbikat", "yangın tatbikatı",
+        "film", "sinema", "dizi", "roman", "şarkı", "klip",
+        "olası yangın", "yangın riski",
+        "yangın merdiveni", "yangın tüpü", "yangın dolabı",
+        "yangın eğitimi", "yangın güvenliği",
+        "itfaiye eğitimi"
     ],
+
     "Trafik Kazası": [
-        "trafik kazası", "kaza yaptı", "zincirleme kaza", "araç devrildi", 
-        "otobüs devrildi", "kamyon devrildi", "tır devrildi", "çarpışma", 
-        "çarpıştı", "takla attı", "şarampole yuvarlandı", "kaza geçirdi",
-        "maddi hasarlı kaza", "feci kaza"
+        "tatbikat", "simülasyon",
+        "film", "dizi", "oyun",
+        "kaza yaparsa", "kaza riski",
+        "yol çalışması", "bakım çalışması", "yenileme çalışması",
+        "trafik eğitimi"
     ],
+
     "Hırsızlık": [
-        "hırsız", "çalındı", "soygun", "gasp", "araç çalındı", 
-        "market soygunu", "dükkan soygunu", "evden çalındı", 
-        "kapkaç", "kuyumcu soygunu", "çaldı"
+        "film", "dizi", "senaryo",
+        "oyun", "tiyatro",
+        "hırsızlık şakası", "hırsızlık filmi",
+        "dolandırıcılık uyarısı"
     ],
+
     "Elektrik Kesintisi": [
-        "elektrik kesintisi", "elektrik kesildi", "elektrik arızası", 
-        "trafo arızası", "güç kesintisi", "elektrik verilemiyor", 
-        "karanlıkta kaldı", "elektrikler gitti", "vedaş", "edaş", "ayedaş", "sedaş"
+        "fatura", "ödeme", "abonelik",
+        "indirim", "kampanya",
+        "fiyat artışı", "zam",
+        "altyapı çalışması", "kazı çalışması",
+        "elektrik direği dikildi"
     ],
-    "Kültürel Etkinlik": [
-        "konser", "festival", "sergi açıldı", "tiyatro gösterisi", 
-        "kültür festivali", "fuar açıldı", "şenlik", "müzik dinletisi", 
-        "sanat etkinliği", "resital", "film festivali", "halk konseri",
-        "imza günü", "söyleşi"
-    ],
+
+    "Kültürel Etkinlikler": [
+        "iptal edildi",
+        "ertelendi",
+        "bilet satış",
+        "bilet fiyat",
+        "tanıtım toplantısı"
+    ]
 }
 
-PRIORITY = ["Yangın", "Trafik Kazası", "Hırsızlık", "Elektrik Kesintisi", "Kültürel Etkinlik"]
+
+# ── 3. ANAHTAR KELİMELER ── #
+
+KEYWORDS = {
+
+    "Yangın": [
+        "yangın", "yangın çıktı",
+        "alev aldı", "alevlere teslim",
+        "ev yandı", "bina yandı", "araç yandı",
+        "fabrika yandı", "depo yandı",
+        "orman yangını",
+        "duman yükseldi", "duman çıktı",
+        "itfaiye sevk edildi",
+        "söndürme çalışması",
+        "kundaklama",
+        "yangın paniği"
+    ],
+
+    "Trafik Kazası": [
+        "trafik kazası",
+        "kaza yaptı", "kaza meydana geldi",
+        "zincirleme kaza", "zincirleme trafik kazası",
+        "çarpıştı", "çarpışma",
+        "araç devrildi",
+        "otobüs devrildi", "kamyon devrildi", "tır devrildi",
+        "takla attı",
+        "şarampole yuvarlandı",
+        "yayaya çarptı",
+        "motosiklet kazası",
+        "yoldan çıktı",
+        "feci kaza",
+        "kontrolden çıktı"
+    ],
+
+    "Hırsızlık": [
+        "hırsız", "hırsızlık",
+        "çalındı", "çaldı",
+        "soygun", "gasp",
+        "kapkaç",
+        "evden hırsızlık",
+        "iş yerinden hırsızlık",
+        "market soygunu",
+        "dükkan soygunu",
+        "kuyumcu soygunu",
+        "araç çalındı",
+        "kablo hırsızlığı",
+        "yankesicilik"
+    ],
+
+    "Elektrik Kesintisi": [
+        "elektrik kesintisi",
+        "elektrik kesildi",
+        "elektrikler kesildi",
+        "elektrikler gitti",
+        "elektrik arızası",
+        "trafo arızası",
+        "güç kesintisi",
+        "karanlıkta kaldı",
+        "elektrik verilemiyor",
+        "planlı kesinti",
+        "sedaş", "ayedaş", "vedaş", "edaş", "sepaş"
+    ],
+
+    "Kültürel Etkinlikler": [
+        "konser",
+        "festival",
+        "sergi",
+        "tiyatro",
+        "şenlik",
+        "fuar",
+        "müzik dinletisi",
+        "resital",
+        "film festivali",
+        "halk konseri",
+        "imza günü",
+        "söyleşi",
+        "koro",
+        "sanat etkinliği",
+        "kültürel etkinlik",
+        "gösteri",
+        "konferans"
+    ]
+}
+
+PRIORITY = ["Yangın", "Trafik Kazası", "Hırsızlık", "Elektrik Kesintisi", "Kültürel Etkinlikler"]
 MIN_SCORE = 2
 COMPOUND_WORD_THRESHOLD = 1
 
 def tr_lower(text: str) -> str:
-    """Türkçe karakterleri koruyarak küçük harfe çevirir."""
     return text.replace("I", "ı").replace("İ", "i").lower()
 
 def _is_compound(phrase: str) -> bool:
@@ -69,7 +156,6 @@ def _is_compound(phrase: str) -> bool:
 def _match(kw: str, text: str) -> bool:
     if _is_compound(kw):
         return kw in text
-    # Sadece sol sınır koyuyoruz, kelime ek alabilir (yangın -> yangına)
     pattern = r'(?<![a-zçğışöü])' + re.escape(kw)
     return bool(re.search(pattern, text, re.IGNORECASE | re.UNICODE))
 
@@ -77,27 +163,22 @@ def _score(text_title: str, text_content: str, category: str, keywords: list[str
     score = 0
     combined_text = f"{text_title} {text_content}"
     
-    # 1. Genel Negatif Kontrolü (Haberin türü siyaset/şikayet/açılış ise direkt ele)
-    # Bunu sadece başlıkta veya ilk paragrafta aramak performansı ve doğruluğu artırır, 
-    # ancak şimdilik tüm metinde kontrol ediyoruz.
     for global_neg in GLOBAL_NEGATIVE_KEYWORDS:
         if global_neg in combined_text:
             return 0
             
-    # 2. Kategoriye Özel Negatif Kontrolü
     for neg_kw in NEGATIVE_KEYWORDS.get(category, []):
         if neg_kw in combined_text:
             return 0 
 
-    # 3. Puanlama
     for kw in keywords:
         kw_lower = kw 
         bonus = 1 if _is_compound(kw) else 0
         
         if _match(kw_lower, text_title):
-            score += 3 + bonus   # Başlık ağırlıklı
+            score += 3 + bonus   
         elif _match(kw_lower, text_content):
-            score += 1 + bonus   # İçerik
+            score += 1 + bonus   
             
     return score
 

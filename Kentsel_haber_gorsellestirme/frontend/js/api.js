@@ -1,6 +1,4 @@
-/**
- * api.js — Backend iletişim katmanı
- */
+
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -16,7 +14,7 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-/** Filtrelere göre haberler — backend tarihe göre azalan sırada döner */
+
 export async function fetchNews(filters = {}) {
   const p = new URLSearchParams();
   if (filters.news_type) p.set("news_type",  filters.news_type);

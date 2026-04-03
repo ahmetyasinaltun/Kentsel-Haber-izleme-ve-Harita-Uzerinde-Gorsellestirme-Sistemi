@@ -496,7 +496,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
   </div>
 </div>
 
-<!-- PROGRESS PANELİ -->
+
 <div id="progress-panel" role="status" aria-live="polite">
   <div class="pp-header">
     <div class="pp-spinner" id="pp-spinner"></div>
@@ -523,7 +523,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 
 <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 
-<!-- Maps callback tanımı (module script'ten önce) -->
+
 <script>
   window.__mapReady = function() {
     if (window.__initMapFn) {
@@ -542,11 +542,11 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
            resetFilters, onDateChange, onFilterChange } from "./js/filters.js";
   import { initMap, loadNewsOnMap, clearMarkers, setMapTheme } from "./js/map.js";
 
-  // ── Tema ─────────────────────────────────────────────
+ 
   const savedTheme = localStorage.getItem("kh-theme") || "dark";
   document.documentElement.setAttribute("data-theme", savedTheme);
 
-  // Harita hazır olduğunda resolve eden Promise
+  
   const mapReady = new Promise(resolve => {
     const originalFn = () => { initMap(savedTheme); resolve(); };
     window.__initMapFn = originalFn;
@@ -565,7 +565,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     setMapTheme(t);
   });
 
-  // ── Yardımcılar ──────────────────────────────────────
+  
   let _toastTimer;
   function showToast(msg, type = "info") {
     const el = document.getElementById("toast");
@@ -580,7 +580,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
       new Date().toLocaleTimeString("tr-TR", { hour:"2-digit", minute:"2-digit" });
   }
 
-  // ── Progress Panel ───────────────────────────────────
+  
   const pp = {
     show:  () => document.getElementById("progress-panel").classList.add("visible"),
     hide:  () => document.getElementById("progress-panel").classList.remove("visible"),
@@ -607,7 +607,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     }
   };
 
-  // ── Boş durum ────────────────────────────────────────
+  
   function showEmptyState(msg = "Filtreleri ayarlayın ve<br>«Haberleri Yükle» butonuna basın.") {
     document.getElementById("news-list").innerHTML = `
       <div class="empty-state">
@@ -619,7 +619,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     clearMarkers();
   }
 
-  // ── Buton durumu ─────────────────────────────────────
+  
   const loadBtn  = document.getElementById("btn-load-news");
   const clearBtn = document.getElementById("btn-clear-news");
 
@@ -628,7 +628,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     clearBtn.disabled = val;
   }
 
-  // ── Scrape status polling ─────────────────────────────
+  
   async function waitForScrapeFinish(pollMs = 4000, timeoutMs = 300_000) {
     const deadline = Date.now() + timeoutMs;
     return new Promise((resolve, reject) => {
@@ -697,7 +697,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
 
   loadBtn.addEventListener("click", handleLoad);
 
-  // ── Sıfırla (DB + harita) ────────────────────────────
+  
   clearBtn.addEventListener("click", async () => {
     if (!window.confirm("⚠️ Tüm haberler veritabanından kalıcı olarak silinecek.\n\nEmin misiniz?"))
       return;
@@ -720,13 +720,13 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     }
   });
 
-  // ── Filtreleri başlat ────────────────────────────────
+  
   await initFilters();
 
-  // ── Filtre sıfırla butonu ────────────────────────────
+  
   document.getElementById("btn-reset-filters").addEventListener("click", resetFilters);
 
-  // ── Tarih değişince otomatik DB'den yeniden çek (scraping yok) ───────────
+  
   onDateChange(async () => {
     try {
       const data = await fetchNews(getCurrentFilters());
@@ -738,15 +738,12 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     }
   });
 
-  // ── Sayfa açılışında otomatik yükle ──────────────────
-  // 1. Harita hazır olsun
-  // 2. DB'de haber varsa direkt göster
-  // 3. DB boşsa scraping başlat, bitmesini bekle, göster
+  
   (async function autoLoadOnStartup() {
     try {
       await mapReady;
 
-      // Her açılışta scraping başlat
+      
       setBusy(true);
       pp.reset();
       pp.show();
@@ -755,7 +752,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
       setFooter("Haber siteleri taranıyor…");
 
       try { await triggerScrape(); } catch(e) {
-        // 409 = zaten devam ediyor, sorun değil
+        
         if (!e.message.includes("409") && !e.message.includes("devam")) throw e;
       }
 
@@ -787,7 +784,6 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
     }
   })();
 
-  // ── Tür / İlçe değişince otomatik yeniden çek ────────
   onFilterChange(async () => {
     try {
       const data = await fetchNews(getCurrentFilters());
@@ -800,7 +796,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
   });
 </script>
 
-<!-- Google Maps API (Map ID olmadan; custom SVG marker kullanılıyor) -->
+
 <script>
   (async () => {
     let key = null;
@@ -822,7 +818,7 @@ select:focus, input[type="date"]:focus { border-color:var(--accent); }
       return;
     }
 
-    // "libraries=marker" KALDIRILDI → Map ID gerekmez, Advanced Marker hatası yok
+    
     const s = document.createElement("script");
     s.src   = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=__mapReady&loading=async`;
     s.defer = true;

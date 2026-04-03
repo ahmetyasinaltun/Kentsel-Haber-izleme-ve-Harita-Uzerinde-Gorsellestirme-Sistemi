@@ -1,5 +1,5 @@
 # HTML temizleme, normalizasyon
-# pipeline/cleaner.py — HTML temizleme ve metin normalizasyonu
+
 import re
 
 
@@ -29,7 +29,7 @@ class Cleaner:
         text = text.replace("&#39;",  "'")
 
         # 3) Reklam / takip metinlerini kaldır
-        #    (haber sitelerinde sıkça görülen kalıplar)
+        #   =
         ad_patterns = [
             r"javascript\s*:",
             r"window\.__[A-Z_]+\s*=",        # JS global değişkenler

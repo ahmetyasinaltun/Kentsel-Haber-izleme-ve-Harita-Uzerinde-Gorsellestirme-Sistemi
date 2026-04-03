@@ -1,9 +1,3 @@
-/**
- * filters.js — Filtre paneli mantığı
- *
- * - Filtre değişikliklerinde otomatik yükleme YAPILMAZ.
- * - setFilterNewsType() legend chip'lerinin state'i senkronize etmesi için export edildi.
- */
 
 import { fetchFilterOptions } from "./api.js";
 
@@ -42,7 +36,7 @@ export async function initFilters() {
   } catch(e) {
     console.warn("Filtre seçenekleri yüklenemedi:", e.message);
     _fill("filter-news-type", [
-      "Trafik Kazası","Yangın","Elektrik Kesintisi","Hırsızlık","Kültürel Etkinlik",
+      "Trafik Kazası","Yangın","Elektrik Kesintisi","Hırsızlık","Kültürel Etkinlikler",
     ], "Tüm Türler");
   }
 
@@ -94,9 +88,7 @@ export function resetFilters() {
   _state = { news_type:"", district:"", date_from:_fmt(threeDaysAgo), date_to:_fmt(today) };
 }
 
-// ─── Dışa açık: news_type state'ini doğrudan güncelle ────────────────────────
-// Legend chip'leri select DOM değerini zaten değiştiriyor;
-// bu fonksiyon filters.js modül state'ini de senkronize eder.
+
 export function setFilterNewsType(value) {
   _state.news_type = value || "";
 }
@@ -124,5 +116,5 @@ function _fill(id, items, placeholder) {
   });
 }
 
-// ─── Yardımcı: YYYY-MM-DD ────────────────────────────────────────────────────
+
 function _fmt(d) { return d.toISOString().split("T")[0]; }
