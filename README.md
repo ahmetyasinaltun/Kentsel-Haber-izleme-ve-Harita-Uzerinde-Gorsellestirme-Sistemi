@@ -95,12 +95,12 @@ Temel endpoint’ler (`/api` prefix’i ile):
 
 ## Veri Akışı
 
-1. Kaynak sitelerden haberler toplanır  
-2. Metinler temizlenir ve sınıflandırılır  
-3. Konum/ilçe çıkarımı yapılır  
-4. Geocoding ile koordinatlar üretilir  
-5. Tekrarlı kayıtlar ayıklanır  
-6. Sonuçlar MongoDB’ye kaydedilir  
+1. Kaynak sitelerden haberler toplanır
+2. Metinler temizlenir ve sınıflandırılır
+3. Konum/ilçe çıkarımı yapılır
+4. Geocoding ile koordinatlar üretilir
+5. Tekrarlı kayıtlar ayıklanır
+6. Sonuçlar MongoDB’ye kaydedilir
 7. Frontend filtreleyip harita üzerinde gösterir
 
 ## Notlar
