@@ -44,8 +44,7 @@ Kentsel_haber_gorsellestirme/
 
 - Python 3.11+
 - MongoDB
-- Google Maps API Key
-- Google Geocoding API Key
+- Google Maps Platform API Key (Maps JavaScript API + Geocoding API etkin)
 
 ## Ortam Değişkenleri (.env)
 
@@ -83,15 +82,15 @@ Ardından tarayıcıdan açın: `http://localhost:5500`
 
 ## API Özet
 
-Temel endpoint’ler (`/api` prefix’i ile):
+Temel endpoint’ler:
 
-- `POST /scrape` → scraping işlemini arka planda başlatır
-- `GET /scrape/status` → scraping durumunu döner
-- `GET /news` → haberleri filtrelerle listeler
-- `DELETE /news` → tüm haberleri siler
-- `GET /news/{news_id}` → tek haber döner
-- `GET /filter/options` → filtre seçeneklerini döner
-- `GET /config/maps-key` → frontend için Maps API key döner
+- `POST /api/scrape` → scraping işlemini arka planda başlatır
+- `GET /api/scrape/status` → scraping durumunu döner
+- `GET /api/news` → haberleri filtrelerle listeler
+- `DELETE /api/news` → tüm haberleri siler
+- `GET /api/news/{news_id}` → tek haber döner
+- `GET /api/filter/options` → filtre seçeneklerini döner
+- `GET /api/config/maps-key` → frontend için Maps API key döner
 
 ## Veri Akışı
 
