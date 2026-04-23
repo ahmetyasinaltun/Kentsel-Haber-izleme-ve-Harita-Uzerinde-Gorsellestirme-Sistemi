@@ -11,16 +11,27 @@ env/
 venv/
 .venv/
 
-# ─── Environment & Secrets ────────────────────────────
-.env
-!.env.example
-
 # ─── Node ─────────────────────────────────────────────
 node_modules/
+package-lock.json
 
-# ─── IDE ──────────────────────────────────────────────
+# ─── Environment & Secrets ────────────────────────────
+.env
+*.env
+.env.*
+!.env.example
+
+# ─── IDE / Editor ─────────────────────────────────────
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Docker ───────────────────────────────────────────
+mongo_data/
 
 # ─── Misc ─────────────────────────────────────────────
 *.log
